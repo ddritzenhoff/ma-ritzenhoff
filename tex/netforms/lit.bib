@@ -20,3 +20,89 @@
   biburl    = {https://dblp.org/rec/conf/imc/EmmerichGRWC15.bib},
   bibsource = {dblp computer science bibliography, https://dblp.org}
 }
+
+@misc{rfc9000,
+    series =    {Request for Comments},
+    number =    9000,
+    howpublished =  {RFC 9000},
+    publisher = {RFC Editor},
+    doi =       {10.17487/RFC9000},
+    url =       {https://www.rfc-editor.org/info/rfc9000},
+    author =    {Jana Iyengar and Martin Thomson},
+    title =     {{QUIC: A UDP-Based Multiplexed and Secure Transport}},
+    pagetotal = 151,
+    year =      2021,
+    month =     may,
+    abstract =  {This document defines the core of the QUIC transport protocol. QUIC provides applications with flow-controlled streams for structured communication, low-latency connection establishment, and network path migration. QUIC includes security measures that ensure confidentiality, integrity, and availability in a range of deployment circumstances. Accompanying documents describe the integration of TLS for key negotiation, loss detection, and an exemplary congestion control algorithm.},
+}
+
+@misc{rfc9293,
+    series =    {Request for Comments},
+    number =    9293,
+    howpublished =  {RFC 9293},
+    publisher = {RFC Editor},
+    doi =       {10.17487/RFC9293},
+    url =       {https://www.rfc-editor.org/info/rfc9293},
+    author =    {Wesley Eddy},
+    title =     {{Transmission Control Protocol (TCP)}},
+    pagetotal = 98,
+    year =      2022,
+    month =     aug,
+    abstract =  {This document specifies the Transmission Control Protocol (TCP). TCP is an important transport-layer protocol in the Internet protocol stack, and it has continuously evolved over decades of use and growth of the Internet. Over this time, a number of changes have been made to TCP as it was specified in RFC 793, though these have only been documented in a piecemeal fashion. This document collects and brings those changes together with the protocol specification from RFC 793. This document obsoletes RFC 793, as well as RFCs 879, 2873, 6093, 6429, 6528, and 6691 that updated parts of RFC 793. It updates RFCs 1011 and 1122, and it should be considered as a replacement for the portions of those documents dealing with TCP requirements. It also updates RFC 5961 by adding a small clarification in reset handling while in the SYN-RECEIVED state. The TCP header control bits from RFC 793 have also been updated based on RFC 3168.},
+}
+
+@inproceedings{Zhang_2024, series={WWW ’24},
+   title={QUIC is not Quick Enough over Fast Internet},
+   url={http://dx.doi.org/10.1145/3589334.3645323},
+   DOI={10.1145/3589334.3645323},
+   booktitle={Proceedings of the ACM Web Conference 2024},
+   publisher={ACM},
+   author={Zhang, Xumiao and Jin, Shuowei and He, Yi and Hassan, Ahmad and Mao, Z. Morley and Qian, Feng and Zhang, Zhi-Li},
+   year={2024},
+   month=may, pages={2713–2722},
+   collection={WWW ’24} }
+
+@inproceedings{quic_on_the_highway,
+author = {Jaeger, Benedikt and Zirngibl, Johannes and Kempf, Marcel and Ploch, Kevin and Carle, Georg},
+year = {2023},
+month = {06},
+pages = {1-9},
+title = {QUIC on the Highway: Evaluating Performance on High-rate Links},
+doi = {10.23919/IFIPNetworking57963.2023.10186365}
+}
+
+@misc{linux_xdp_merge_2016,
+  author       = {David S. Miller},
+  title        = {Merge branch 'xdp': Add driver BPF hook for early packet drop and forwarding},
+  year         = {2016},
+  month        = {July},
+  note         = {Commit hash: 22b3548861fb21ad79e0d3afeee123b0eb3912cc},
+  howpublished = {\url{https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=22b3548861fb21ad79e0d3afeee123b0eb3912cc}},
+  abstract     = {This patch set introduces new infrastructure for programmatically processing packets in the earliest stages of rx, as part of an effort others are calling eXpress Data Path (XDP). Start this effort by introducing a new bpf program type for early packet filtering, before even an skb has been allocated.}
+}
+
+@inproceedings{10.1007/978-981-97-0798-0_6,
+author = {Huang, Tianyi and Zhao, Shizhen},
+title = {Accelerating QUIC with AF\_XDP},
+year = {2024},
+isbn = {978-981-97-0797-3},
+publisher = {Springer-Verlag},
+address = {Berlin, Heidelberg},
+url = {https://doi.org/10.1007/978-981-97-0798-0_6},
+doi = {10.1007/978-981-97-0798-0_6},
+abstract = {QUIC is a high-performance and secure transport layer protocol that has been applied in many scenarios. Considering that kernel bypass techniques can avoid the overhead of the kernel’s network stack and therefore improve the performance greatly, we choose AF\_XDP, a compatible kernel bypass technique to improve the performance of QUIC. We present XSKConn, a Golang package that implements UDP connection based on AF\_XDP and we integrate it into quic-go. The experiments show that XSKConn improves the RPS of quic-go by 5\% to 40\%, while the CPU usage also decreases by 5\% to 50\%.},
+booktitle = {Algorithms and Architectures for Parallel Processing: 23rd International Conference, ICA3PP 2023, Tianjin, China, October 20–22, 2023, Proceedings, Part III},
+pages = {89–100},
+numpages = {12},
+keywords = {network system, eBPF, QUIC, kernel bypass},
+location = {Tianjin, China}
+}
+
+@inproceedings{eQUIC_Gateway,
+author = {Pantuza, Gustavo and Vieira, Marcos and Vieira, Luiz},
+year = {2021},
+month = {09},
+pages = {1-6},
+title = {eQUIC Gateway: Maximizing QUIC Throughput using a Gateway Service based on eBPF + XDP},
+doi = {10.1109/ISCC53001.2021.9631262}
+}

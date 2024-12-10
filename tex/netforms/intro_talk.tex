@@ -64,77 +64,91 @@
 
 \subsection*{Topic}
 
-\todo{Add Motivation: Why is this topic relevant? Which ``big'' problem does it solve?}
-This Bachelor's Thesis shall implement a wide band scanning application
-resembling a spectrum analyzer using software defined radio hardware.
-It shall be possible to both sweep the whole spectrum supported by the hardware
-in use as well as tuning into specific parts of that spectrum.
-In addition it shall be possible to record a narrow band of the spectrum for
-both offline-analyses and replay at a later time.
-The intended field of application is, for instance, the generation of
-reproducible error signals in a testbed or empirically measuring the gain
-of different antennas.
+QUIC \cite{rfc9000}, standardized in 2021 by the Internet Engineering Task Force (IETF), is a secure general purpose transport protocol meant to provide client-server connections with flow-controlled streams for structured data exchange, rapid connection establishments, and network path migration. QUIC is an alternative to TCP \cite{rfc9293} and differs itself by avoiding head-of-line blocking, offering a zero-round-trip-time (0-RTT) handshake, using UDP, and existing primarily as user-space implementations. However, many QUIC implementations have also been shown to be less performant than TCP in the presence of high-bandwidth networks \cite{Zhang_2024}. Previous work from Jaeger et al. \cite{quic_on_the_highway} has shown that QUIC throughput is most impacted by packet I/O. One of the approaches to reducing this overhead is with eXpress Data Path (XDP), which is a high performance data path in the Linux kernel based on the extended Berkeley Packet Filter (eBPF) runtime. XDP is hosted by the Linux Foundation and was first introduced into the Linux kernel in 2016 \cite{linux_xdp_merge_2016}. XDP works by introducing a hook into the network receive (RX) path and can be used to handle packets at the earliest possible time, before any other work is done. With AF\_XDP, a socket type, it is also possible to send the raw layer 2 frames directly to userspace for processing. At the cost of some additional header processing, the packets may skip the Linux network stack. This Master's thesis shall investigate the performance improvements in throughput as a result of combining AF\_XDP with QUIC.
+
+% \todo{Add Motivation: Why is this topic relevant? Which ``big'' problem does it solve?}
+% This Bachelor's Thesis shall implement a wide band scanning application
+% resembling a spectrum analyzer using software defined radio hardware.
+% It shall be possible to both sweep the whole spectrum supported by the hardware
+% in use as well as tuning into specific parts of that spectrum.
+% In addition it shall be possible to record a narrow band of the spectrum for
+% both offline-analyses and replay at a later time.
+% The intended field of application is, for instance, the generation of
+% reproducible error signals in a testbed or empirically measuring the gain
+% of different antennas.
+
+% - The topic is relevant because QUIC is an up and coming transport protocol, which has been increasing in popularity over the last few years \cite{}. However, its performance is not up to par with TCP \cite{}. Therefore, it's important to find ways in order to improve it. One of the potential avenues is with XDP.
+% - The big problem that XDP solves is that it improves the speed of QUIC.
+
+% Use cases of XDP
+% - Bare metal packet processing at the lowest point in the software stack
+% - Use cases include
+%   - pre-stack processing like filtering to do DOS mitigation
+%   - forwarding and load balancing
+%   - batching techniques such as in generic receive offload
+%   - flow sampling, monitoring
+%   - ULP processing 
+
+% Advantages of XDP over DPDK
+% - Allows option of busy polling or interrupt driven networking (I'm pretty sure DPDK only allows busy polling)
+% - No need to allocate huge pages
+% - Dedicated CPUs are not required, user has many options on how to structure the work between CPUs
+% - No need to inject packets into the kernel from a third-party userspace application. 
+% - No special hardware requirements
+% - No need to define a new security model for accessing networking hardware. 
+% - No third party code/licensing required.
 
 \subsection*{Related Work}
 
-\todo{Explain here how this project compares to existing publications}
+% \todo{Explain here how this project compares to existing publications}
 
-The thesis is thematically similar to the Master's Thesis \emph{Automatic Line
-Code Detection of RF Signals on Software Defined Radios}, which also implemented a spectrum analyzer.
-However, it was never planned to record or replay signals.
-In addition, this thesis lacks some scientific rigor with respect to the
-validity of recorded samples.
+This thesis is thematically similar to the Master's Thesis \emph{QUIC Performance Improvements Using Socket Optimizations and Kernel Bypass}, which investigates methods to improve QUIC performance. It does not, however, investigate XDP.
 
+Huang and Zhao \cite{10.1007/978-981-97-0798-0_6} describe accelerating QUIC with AF\_XDP in quic-go. This thesis differs by using msquic. Additionally, this paper lacks scientific rigor by not providing artifacts and a way to reproduce the experiments.
+
+Pantuza et al. \cite{eQUIC_Gateway} increases QUIC throughput by combining it with XDP to rate limit connections. Our thesis differs by focusing on the throughput benefits from strictly combining QUIC with XDP.
 
 \subsection*{Research Questions}
 
-\todo{Optional section: Maybe you can formulate research questions which you try to answer in this thesis}
+% \todo{Optional section: Maybe you can formulate research questions which you try to answer in this thesis}
 
 \begin{researchquestions}
-\item Do USB interfaces interfere with SDR?
+\item Does Linux kernel network stack bypass with XDP help improve performance of QUIC?
 \end{researchquestions}
 
 \subsection*{Approach}
-In the first part we will make measurements and statistic evaluations to
-ensure, that the acquired data, which comes from the SDR, is valid.  Therefore
-we will test, if the samples are valid right after the internal tuning phase of
-the SDR.
-We will also investigate whether or not external influences such as the USB
-interface interfere with the process.
-Other influence such as the quantization error will also be analyzed.
-The latter are of particular interest when it comes to replay of previously
-recorded signals.
-The second part is about the scanning application itself.
-The program can use the wide range of the present USRP hardware, which covers a
-frequency range from 75\,MHz to 6\,GHz.
-The tool would scan the whole band for online investigation or store the
-samples for later use.
-Further more, you will be able to rescan narrow bands of the spectrum to have a
-closer look whats happening there.
-The UI will consist of a zoomable heatmap (waterfall diagram) interface with
-mouse support.
+In the first part, we will get msquic with XDP building on Linux and measure goodput in client-server file download scenarios using the QUIC Interop Runner (QIR) from Jaeger et al. \cite{quic_on_the_highway}. 
 
-To get proper values to display, we have to consider different parameters like
-integration time and gain settings etc.
-These parameters will also be part of the research.
-The software will be based on the GNUradio software defined radio
-framework.  The additional work is planed to be done with python3.
-The used hardware consists of 2 URSP b210, where for the main part only one is
-needed.
+% In the first part we will make measurements and statistic evaluations to
+% ensure, that the acquired data, which comes from the SDR, is valid.  Therefore
+% we will test, if the samples are valid right after the internal tuning phase of
+% the SDR.
+% We will also investigate whether or not external influences such as the USB
+% interface interfere with the process.
+% Other influence such as the quantization error will also be analyzed.
+% The latter are of particular interest when it comes to replay of previously
+% recorded signals.
+% The second part is about the scanning application itself.
+% The program can use the wide range of the present USRP hardware, which covers a
+% frequency range from 75\,MHz to 6\,GHz.
+% The tool would scan the whole band for online investigation or store the
+% samples for later use.
+% Further more, you will be able to rescan narrow bands of the spectrum to have a
+% closer look whats happening there.
+% The UI will consist of a zoomable heatmap (waterfall diagram) interface with
+% mouse support.
+
+% To get proper values to display, we have to consider different parameters like
+% integration time and gain settings etc.
+% These parameters will also be part of the research.
+% The software will be based on the GNUradio software defined radio
+% framework.  The additional work is planed to be done with python3.
+% The used hardware consists of 2 URSP b210, where for the main part only one is
+% needed.
 
 \subsection*{Skills}
-\todo{Optional section: include only if you
-have worked on projects that are relevant for this thesis.}
 
-I did some previous work with SDR hardware, the RTL-SDR and the
-hackrf.
-For this work the packet generator MoonGen was used~\cite{DBLP:conf/imc/EmmerichGRWC15}.
-I am quite familiar with the software (GNUradio) and
-hardware environment.
-
-\subsection*{Additional Hardware Requirements}
-\todo{Optional section: include only if you
-    need new hardware for this thesis.}
+I implemented an extension to the quic-go repository by integrating Forward Erasure Coding as part of my IDP. This experience provided lots of exposure to how QUIC functions.
 
 \subsection*{Planned Schedule}
 \begin{figure}[H]
