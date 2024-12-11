@@ -117,7 +117,7 @@ Pantuza et al. \cite{eQUIC_Gateway} increases QUIC throughput by combining it wi
 \end{researchquestions}
 
 \subsection*{Approach}
-In the first part, we will get msquic with XDP building on Linux and measure goodput in client-server file download scenarios using the QUIC Interop Runner (QIR) from Jaeger et al. \cite{quic_on_the_highway}. 
+In the first part, we will build msquic on Linux with XDP and measure goodput in client-server file download scenarios using the QUIC Interop Runner (QIR) from Jaeger et al. \cite{quic_on_the_highway}. For the analysis, we will use the performance analyzing tool perf \cite{melo2010perf} to determine how the CPU spent its time. This will allow us to analyze the benefits from using XDP. Moreover, FlameGraphs \cite{gregg_flamegraph_2024} will build upon this data and produce complementary visuals.
 
 % In the first part we will make measurements and statistic evaluations to
 % ensure, that the acquired data, which comes from the SDR, is valid.  Therefore
