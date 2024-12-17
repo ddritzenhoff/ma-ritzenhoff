@@ -64,7 +64,9 @@
 
 \subsection*{Topic}
 
-QUIC \cite{rfc9000}, standardized in 2021 by the Internet Engineering Task Force (IETF), is a secure general purpose transport protocol meant to provide client-server connections with flow-controlled streams for structured data exchange, rapid connection establishments, and network path migration. QUIC is an alternative to TCP \cite{rfc9293} and differs itself by avoiding head-of-line blocking, offering a zero-round-trip-time (0-RTT) handshake, using UDP, and existing primarily as user-space implementations. However, many QUIC implementations have also been shown to be less performant than TCP in the presence of high-bandwidth networks \cite{Zhang_2024}. Previous work from Jaeger et al. \cite{quic_on_the_highway} has shown that QUIC throughput is most impacted by packet I/O. One of the approaches to reducing this overhead is with eXpress Data Path (XDP), which is a high performance data path in the Linux kernel based on the extended Berkeley Packet Filter (eBPF) runtime. XDP is hosted by the Linux Foundation and was first introduced into the Linux kernel in 2016 \cite{linux_xdp_merge_2016}. XDP works by introducing a hook into the network receive (RX) path and can be used to handle packets at the earliest possible time, before any other work is done. With AF\_XDP, a socket type, it is also possible to send the raw layer 2 frames directly to userspace for processing. At the cost of some additional header processing, the packets may skip the Linux network stack. This Master's thesis shall investigate the performance improvements in throughput as a result of combining AF\_XDP with QUIC.
+QUIC \cite{rfc9000} is a new general-purpose transport protocol, first standardized by the Internet Engineering Task Force (IETF) in 2021, which combines features from mature protocols such as TCP~\cite{rfc9293}, UDP~\cite{rfc768}, and TLS~\cite{rfc8446}. QUIC differentiates itself in that it offers secure connections by default, promises fewer round trips before data is transmitted, fixes the head-of-line blocking present with TCP, and is designed to be extensible through its userspace implementations. The Hypertext Transport Protocol 3 (HTTP/3)~\cite{rfc9114}, which is the newest version of HTTP and is the most popular application-level protocol built upon QUIC, now commands 20.5\% of HTTP traffic worldwide~\cite{cloudflare2024}. Therefore, as QUIC increases in usage, it is critical to find ways to improve its performance. Previous work from Jaeger et al.~\cite{quic_on_the_highway} has shown that QUIC throughput is most impacted by packet I/O. One of the approaches to reducing this overhead is with eXpress Data Path (XDP), which is a high performance data path in the Linux kernel based on the extended Berkeley Packet Filter (eBPF) runtime. First introduced in 2016~\cite{linux_xdp_merge_2016}, XDP works by introducing a hook into the network receive (RX) path and can be used to handle packets at the earliest possible time, before any other work is done. With AF\_XDP, a socket type, it is also possible to send the raw layer 2 frames with XDP directly to the userspace QUIC implementations. At the cost of some additional header processing, AF\_XDP allows the packets to skip the Linux network stack. Moreover, to further increase performance, we may begin offloading certain QUIC protocol features. This Master's thesis shall investigate the performance improvements in throughput and reduced CPU usage as a result of combining AF\_XDP with QUIC and patching msquic to add support for Ethernet frame checksum offloading.
+
+% QUIC \cite{rfc9000}, standardized in 2021 by the Internet Engineering Task Force (IETF), is a secure general purpose transport protocol meant to provide client-server connections with flow-controlled streams for structured data exchange, rapid connection establishments, and network path migration. QUIC is an alternative to TCP \cite{rfc9293} and differs itself by avoiding head-of-line blocking, offering a zero-round-trip-time (0-RTT) handshake, using UDP, and existing primarily as user-space implementations. However, many QUIC implementations have also been shown to be less performant than TCP in the presence of high-bandwidth networks \cite{Zhang_2024}. Previous work from Jaeger et al. \cite{quic_on_the_highway} has shown that QUIC throughput is most impacted by packet I/O. One of the approaches to reducing this overhead is with eXpress Data Path (XDP), which is a high performance data path in the Linux kernel based on the extended Berkeley Packet Filter (eBPF) runtime. XDP is hosted by the Linux Foundation and was first introduced into the Linux kernel in 2016 \cite{linux_xdp_merge_2016}. XDP works by introducing a hook into the network receive (RX) path and can be used to handle packets at the earliest possible time, before any other work is done. With AF\_XDP, a socket type, it is also possible to send the raw layer 2 frames directly to userspace for processing. At the cost of some additional header processing, the packets may skip the Linux network stack. This Master's thesis shall investigate the performance improvements in throughput as a result of combining AF\_XDP with QUIC.
 
 % \todo{Add Motivation: Why is this topic relevant? Which ``big'' problem does it solve?}
 % This Bachelor's Thesis shall implement a wide band scanning application
@@ -106,18 +108,21 @@ This thesis is thematically similar to the Master's Thesis \emph{QUIC Performanc
 
 Huang and Zhao \cite{10.1007/978-981-97-0798-0_6} describe accelerating QUIC with AF\_XDP in quic-go. This thesis differs by using msquic. Additionally, this paper lacks scientific rigor by not providing artifacts and a way to reproduce the experiments.
 
-Pantuza et al. \cite{eQUIC_Gateway} increases QUIC throughput by combining it with XDP to rate limit connections. Our thesis differs by focusing on the throughput benefits from strictly combining QUIC with XDP.
+Pantuza et al. \cite{eQUIC_Gateway} increases QUIC throughput by combining it with XDP to rate limit connections. Our thesis differs by focusing on the throughput and CPU usage benefits that come from strictly combining QUIC with XDP and using checksum offloading.
 
 \subsection*{Research Questions}
 
 % \todo{Optional section: Maybe you can formulate research questions which you try to answer in this thesis}
 
 \begin{researchquestions}
-\item Does Linux kernel network stack bypass with XDP help improve performance of QUIC?
+\item Does bypassing the Linux kernel network stack with XDP increase the maximum possible throughput with QUIC?
+\item Does TX checksum offloading with AF\_XDP and QUIC reduce average CPU usage in client-server file download scenarios?
 \end{researchquestions}
 
 \subsection*{Approach}
-In the first part, we will build msquic on Linux with XDP and measure goodput in client-server file download scenarios using the QUIC Interop Runner (QIR) from Jaeger et al. \cite{quic_on_the_highway}. For the analysis, we will use the performance analyzing tool perf \cite{melo2010perf} to determine how the CPU spent its time. This will allow us to analyze the benefits from using XDP. Moreover, FlameGraphs \cite{gregg_flamegraph_2024} will build upon this data and produce complementary visuals.
+In the first part, we will build msquic with XDP for Linux and measure goodput in client-server file download scenarios using the QUIC Interop Runner (QIR) from Jaeger et al.~\cite{quic_on_the_highway}. Documentation for XDP in msquic is poor, and the code is still experimental, so this is not expected to be trivial. For the analysis, we will use the performance analyzing tool perf~\cite{melo2010perf} to track CPU usage over time. This allows us to analyze the benefits from using XDP over the XDP-less msquic implementation. Moreover, FlameGraphs \cite{gregg_flamegraph_2024} will build upon this data and produce complementary visuals. Finally, we will also use the QIR infrastructure to calculate the throughput achieved. This will allow us to compare the throughput per CPU usage between XDP msquic and non-XDP msquic.
+
+Next, we patch msquic to use AF\_XDP metadata and TX checksum offloading, support for which was added to the Linux kernel in early 2023 \cite{fomichev2023xsk}. This will require understanding the structure of the msquic code and modifying the requisite components. Thereafter, we use the mlx5 driver from Mellanox, the only driver to carry support for these changes, to re-run the performance tests from part one. We expect the CPU usage decrease for the same amount of throughput.
 
 % In the first part we will make measurements and statistic evaluations to
 % ensure, that the acquired data, which comes from the SDR, is valid.  Therefore
@@ -154,7 +159,7 @@ I implemented an extension to the quic-go repository by integrating Forward Eras
 \begin{figure}[H]
   \centering
   \begin{ganttchart}[
-      x unit=1.25mm,
+      x unit=0.88mm,
       y unit title=0.6cm,
       title height=1,
       title label font=\small,
@@ -167,15 +172,16 @@ I implemented an extension to the quic-go repository by integrating Forward Eras
       time slot unit=day,
       inline,
       bar height=0.7,
-    ]{2016-04-15}{2016-08-25}
+    ]{2025-01-15}{2025-07-15}
     \gantttitlecalendar{month=name}\\
-    \ganttbar{Reading}{2016-04-15}{2016-04-28}\\
-    \ganttbar{Setup testbed}{2016-04-15}{2016-05-05}\\
-    \ganttbar{Work on first prototype}{2016-05-01}{2016-05-30}\\
-    \ganttbar{Perform measurements}{2016-05-20}{2016-07-15}\\
-    \ganttmilestone{Intermediate talk}{2016-06-15}\\
-    \ganttbar{Write thesis}{2016-06-30}{2016-08-15}\\
-    \ganttmilestone{Submission}{2016-08-14}
+    \ganttbar{Reading}{2025-01-15}{2025-02-01}\\
+    \ganttbar{Setup testbed}{2025-01-15}{2025-02-08}\\
+    \ganttbar{Perform measurements}{2025-02-09}{2025-04-04}\\
+    \ganttmilestone{Intermediate talk}{2025-04-15}\\
+    \ganttbar{Patch msquic}{2025-03-15}{2025-04-15}\\
+    \ganttbar{Perform measurements}{2025-04-16}{2025-05-22}\\
+    \ganttbar{Write thesis}{2025-04-15}{2025-07-14}\\
+    \ganttmilestone{Submission}{2025-07-14}
   \end{ganttchart}
   \label{fig:work-plan}
 \end{figure}
