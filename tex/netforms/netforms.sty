@@ -33,8 +33,10 @@
 \def\theheimattelefon{}
 \def\theheimatmobiltelefon{}
 \def\thebetreuer{}
+\def\thebeginntag{}
 \def\thebeginnmonat{}
 \def\thebeginnjahr{}
+\def\theendtag{}
 \def\theendmonat{}
 \def\theendjahr{}
 \def\therbgaccount{}
@@ -205,13 +207,15 @@
 		\stepcounter{netforms@betreuer@cnt}%
 	}
 }
-\DeclareDocumentCommand{\beginn}{m m}{%
-	\def\thebeginnmonat{#1}
-	\def\thebeginnjahr{#2}
+\DeclareDocumentCommand{\beginn}{m m m}{%
+	\def\thebeginntag{#1}
+	\def\thebeginnmonat{#2}
+	\def\thebeginnjahr{#3}
 }
-\DeclareDocumentCommand{\endt}{m m}{%
-	\def\theendmonat{#1}
-	\def\theendjahr{#2}
+\DeclareDocumentCommand{\endt}{m m m}{%
+	\def\theendtag{#1}
+	\def\theendmonat{#2}
+	\def\theendjahr{#3}
 }
 \DeclareDocumentCommand{\rbgaccount}{m}{\def\therbgaccount{#1}}
 \DeclareDocumentCommand{\taetigkeit}{m}{\def\thetaetigkeit{#1}}
@@ -425,7 +429,8 @@ Thema (deutsch \textbf{und} englisch):
 	}
 
 	\node[right] (x) at (0,-1.7) {Beginn:};
-	\node[right] (x) at ($(x.west)+(3,0)$) {15.};
+	\node[box,text width=.55cm] (x) at ($(x.west)+(3,0)$)
+		{\thebeginntag.};
 	\node[box,text width=.55cm] (x) at ($(x.east)$)
 		{\thebeginnmonat.};
 	\node[box,text width=.80cm] (x) at ($(x.east)+(0.2,0)$)
@@ -474,7 +479,7 @@ Thema (deutsch \textbf{und} englisch):
 \adjustbox{valign=b}{\begin{minipage}{1.2cm}%
 	\INlogo{height=1cm,color=TUMDarkerBlue}%
 \end{minipage}}%
-\adjustbox{valign=b}{\begin{minipage}{4cm}%
+\adjustbox{valign=b}{\begin{minipage}{4.5cm}%
 	\vfill
 	\school
 \end{minipage}}%
