@@ -61,6 +61,19 @@
 % date
 \usepackage{datetime}
 
+\usepackage{listings}
+\lstset{basicstyle=\scriptsize\linespread{1}\ttfamily,
+	numberstyle=\scriptsize\color{gray},
+	numbers=left,
+	frame=lines,
+	framerule=.5pt,
+	belowcaptionskip=3pt,
+	language=c,
+	keywordstyle=\color{TUMDarkerBlue},
+	commentstyle=\color{black!60},
+	otherkeywords={u8,size_t,uint8_t,uint64_t,v4df,v8sf},
+}
+
 % Use cm sum
 % http://tex.stackexchange.com/questions/200910/replace-a-few-math-symbols-in-the-newtxmath-font
 \DeclareSymbolFont{largesymbolsCM}{OMX}{cmex}{m}{n}

@@ -1,3 +1,126 @@
+@misc{lxin_quic,
+  author       = {Xin Long},
+  title        = {In-kernel QUIC Implementation with Userspace Handshake},
+  year         = {2023},
+  howpublished = {\url{https://github.com/lxin/quic}},
+  note         = {Accessed: 2025-04-20}
+}
+
+@misc{dpdk,
+   title={Data Plane Development Kit ({DPDK})},
+   author={Linux Foundation},
+   year={2015},
+   url = {http://www.dpdk.org}
+}
+
+@misc{torvalds2021xdp,
+  author       = {Tariq Toukan},
+  title        = {net/mlx5e: RX, Add XDP multi-buffer support in Striding RQ},
+  year         = {2023},
+  month        = {April},
+  howpublished = {\url{https://github.com/torvalds/linux/commit/f52ac7028bec22e925c8fece4f21641eb13b4d6f}},
+  note         = {Commit f52ac7028bec22e925c8fece4f21641eb13b4d6f in the Linux kernel source tree},
+}
+
+@misc{gregg_flamegraph,
+  author       = {Brendan Gregg},
+  title        = {FlameGraph: Stack trace visualization tool},
+  year         = {2016},
+  howpublished = {\url{https://github.com/brendangregg/FlameGraph}},
+  note         = {Accessed: 2025-04-17}
+}
+
+@misc{network-topology,
+  title        = {Tallinn},
+  howpublished = {\url{https://kaunas.net.cit.tum.de/topology_files/tallinn.pdf}},
+  year         = {2024},
+  note         = {Accessed on 2025-04-17}
+}
+
+@misc{msquic_github,
+  author       = {{Microsoft}},
+  title        = {msquic: Cross-platform, C implementation of the IETF QUIC protocol},
+  year         = {2019},
+  howpublished = {\url{https://github.com/microsoft/msquic}},
+  note         = {Accessed: 2025-04-17}
+}
+
+@misc{cloudflare_af_xdp_cookie,
+  author       = {Bastien Dhiver},
+  title        = {A story about AF\_XDP, network namespaces, and a cookie},
+  year         = {2022},
+  howpublished = {\url{https://blog.cloudflare.com/a-story-about-af-xdp-network-namespaces-and-a-cookie/}},
+  note         = {Cloudflare Blog},
+  urldate      = {2025-04-17}
+}
+
+@misc{af_xdp_image,
+  author       = {Marten Gartner},
+  title        = {Recapitulating AF\_XDP},
+  year         = {2022},
+  howpublished = {\url{https://medium.com/high-performance-network-programming/recapitulating-af-xdp-ef6c1ebead8}},
+  note         = {Figure: "The flow of packets using a normal socket and AF\_XDP", retrieved from the article},
+  urldate      = {2025-04-17}
+}
+
+@inproceedings{quic_on_the_highway,
+author = {Jaeger, Benedikt and Zirngibl, Johannes and Kempf, Marcel and Ploch, Kevin and Carle, Georg},
+year = {2023},
+month = {06},
+pages = {1-9},
+title = {QUIC on the Highway: Evaluating Performance on High-rate Links},
+doi = {10.23919/IFIPNetworking57963.2023.10186365}
+}
+
+@inproceedings{Zhang_2024, series={WWW ’24},
+   title={QUIC is not Quick Enough over Fast Internet},
+   url={http://dx.doi.org/10.1145/3589334.3645323},
+   DOI={10.1145/3589334.3645323},
+   booktitle={Proceedings of the ACM Web Conference 2024},
+   publisher={ACM},
+   author={Zhang, Xumiao and Jin, Shuowei and He, Yi and Hassan, Ahmad and Mao, Z. Morley and Qian, Feng and Zhang, Zhi-Li},
+   year={2024},
+   month=may, pages={2713–2722},
+   collection={WWW ’24} }
+
+@misc{rfc9000,
+    series =    {Request for Comments},
+    number =    9000,
+    howpublished =  {RFC 9000},
+    publisher = {RFC Editor},
+    doi =       {10.17487/RFC9000},
+    url =       {https://www.rfc-editor.org/info/rfc9000},
+    author =    {Jana Iyengar and Martin Thomson},
+    title =     {{QUIC: A UDP-Based Multiplexed and Secure Transport}},
+    pagetotal = 151,
+    year =      2021,
+    month =     may,
+    abstract =  {This document defines the core of the QUIC transport protocol. QUIC provides applications with flow-controlled streams for structured communication, low-latency connection establishment, and network path migration. QUIC includes security measures that ensure confidentiality, integrity, and availability in a range of deployment circumstances. Accompanying documents describe the integration of TLS for key negotiation, loss detection, and an exemplary congestion control algorithm.},
+}
+
+@misc{rfc9114,
+    series =    {Request for Comments},
+    number =    9114,
+    howpublished =  {RFC 9114},
+    publisher = {RFC Editor},
+    doi =       {10.17487/RFC9114},
+    url =       {https://www.rfc-editor.org/info/rfc9114},
+    author =    {Mike Bishop},
+    title =     {{HTTP/3}},
+    pagetotal = 57,
+    year =      2022,
+    month =     jun,
+    abstract =  {The QUIC transport protocol has several features that are desirable in a transport for HTTP, such as stream multiplexing, per-stream flow control, and low-latency connection establishment. This document describes a mapping of HTTP semantics over QUIC. This document also identifies HTTP/2 features that are subsumed by QUIC and describes how HTTP/2 extensions can be ported to HTTP/3.},
+}
+
+@misc{cloudflare2024,
+  author       = {Cloudflare},
+  title        = {Cloudflare Radar Year in Review 2024},
+  year         = {2024},
+  url          = {https://radar.cloudflare.com/year-in-review/2024#http-versions},
+  note         = {Accessed: 2024-12-14},
+}
+
 @misc{rfc959,
   title={{F}ile {T}ransfer {P}rotocol ({FTP})},
   author={J. Postel and J. Reynolds},
