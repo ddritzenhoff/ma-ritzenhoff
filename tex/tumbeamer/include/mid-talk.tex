@@ -36,7 +36,7 @@
 \section{XDP Primer}
 \begin{frame}
     \begin{itemize}
-        \item AF\_XDP is an address family in Linux like AF\_INET or AF\_INET6
+        \item AF\_XDP is an address family in Linux similar to AF\_INET or AF\_INET6
         \item It works with XDP and allows a packet skip the network stack
         \item Helps avoid costly per packet processing
     \end{itemize}
@@ -52,8 +52,8 @@
 \begin{frame}
     \begin{itemize}
         \item AF\_XDP uses UMEM with tx, rx, completion, and fill rings
-        \item Each ring is single producer single consumer
-        \item Avoid locking contention
+        \item Each ring is single producer, single consumer
+        \item Avoids locking contention
         \item Need a single system call to trigger multi-packet sends
     \end{itemize}
     \begin{figure}
@@ -88,10 +88,7 @@
 
 \section{Optimization}
 \begin{frame}
-    \begin{itemize}
-        \item Datapath taking long time to initialize (3s perf trace)
-        \item Optimize by creating UMEM for only one queue on one interface
-    \end{itemize}
+    Datapath long initialization time (3s perf trace) optimized by creating UMEM for only one queue on one interface
     \begin{figure}
         \centering
         \includegraphics[width=1\textwidth]{pics/DataPathInitialize_beforeOpt.png}
@@ -125,7 +122,7 @@
 \begin{frame}
     \begin{itemize}
         \item Move the XDP hook point closer to the driver with XDP\_DRV
-        \item Less overhead per packet, so faster
+        \item No longer constructing sk\_buffs, so less overhead per packet
     \end{itemize}
     \begin{figure}
         \centering
@@ -164,7 +161,7 @@
 \begin{frame}
     \begin{itemize}
         \item Fragmentation with XDP now supported by some NIC drivers \cite{torvalds2021xdp}
-        \item \texttt{rx-gro-hw} with XDP\_DRV or GRO with XDP\_SKB
+        \item \texttt{rx-gro-hw} with XDP\_DRV or GRO with XDP\_SKB when HW offload not available
     \end{itemize}
     \begin{figure}
         \centering
@@ -176,17 +173,24 @@
 \section{Related Work}
 \begin{frame}
     \begin{itemize}
-        \item DPDK \cite{dpdk} is kernel bypass and allows application to connect directly to the NIC.
-        \item lxin-quic \cite{lxin_quic} brings QUIC into the kernel to reduce context switches
+        \item DPDK \cite{dpdk} enables kernel bypass and allows application to connect directly to the NIC, reducing kernel overhead
+        \item lxin-quic \cite{lxin_quic} brings QUIC into the kernel, reducing context switches and copying between kernel and userspace
+        \item \textit{QUIC Performance Improvements Using Socket Optimizations and Kernel Bypass}~\cite{spaeth2023} investigates methods to improve QUIC performance by means
+        of patching MsQuic with DPDK and using socket optimizations
     \end{itemize}
+    % \begin{figure}
+    %     \centering
+    %     \includegraphics[width=.75\textwidth]{pics/dpdk.png}
+    %     \label{fig81}
+    %     \nocite{donato2018dpdk}
+    % \end{figure}
 \end{frame}
 
 \section{Next Steps}
 \begin{frame}
     \begin{itemize}
-        \item Investigate AF\_XDP latency using splitter
-        \item Create taxonomy for QUIC optimizations in terms of implementation complexity, performance improvement potential, unwanted side effects, flexibility, privilege level usage, and
-        dynamic vs. static loading
+        \item Investigate AF\_XDP latency with clock-sychronized splitter and client to measure packet latency based on timing of arrived packets
+        \item Create taxonomy for QUIC optimizations in terms of implementation complexity, performance improvement potential, unwanted side effects, flexibility, privilege level usage, and dynamic vs. static loading
     \end{itemize}
     \begin{figure}
         \centering
@@ -197,11 +201,11 @@
 
 \section{Conclusion}
 \begin{frame}
-    \frametitle{and Next Steps}
     \begin{itemize}
-        \item Implement XOR scheme \yes
-        \item Investigate latency
-        \item Create Taxonomy
+        \item AF\_XDP is not able to achieve a higher throughput over recvmmsg()+GRO
+        \item XDP fragmentation support enables AF\_XDP+GRO to further increase performance
+        \item AF\_XDP skipping the network stack may benefit latency
+        \item AF\_XDP represents one of many methods to reduce packet IO, each with its strengths and weaknesses
     \end{itemize}
 \end{frame}
 
