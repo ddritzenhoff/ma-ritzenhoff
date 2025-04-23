@@ -1,0 +1,52 @@
+% Copyright (c) 2022 Benedikt Jaeger
+
+\documentclass[beamer,multi=true,preview,tikz]{standalone}
+
+\usepackage{packages}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows,calc,positioning}
+
+\begin{document}
+\begin{standaloneframe}[plain]%
+\begin{tikzpicture}
+
+	\pgfdeclarelayer{bg}
+	\pgfsetlayers{bg,main}
+
+	\def\rectwidth{3cm}
+	\def\rectheight{1cm}
+
+	\tikzset{%
+		box/.style={rectangle, draw, rounded corners, line width=1pt,
+		minimum width=\rectwidth, minimum height=\rectheight, outer sep=2pt, align=center},
+		label/.style={anchor=east},
+	}
+
+	\node[box, color=TUMBlue, fill=TUMBlue!20, anchor=south west, minimum width=4pt + 2*\rectwidth] (ip) at (0, 0) {IP};
+	\node[box, color=TUMBlue, fill=TUMBlue!20, anchor=south west] (tcp) at (ip.north west) {TCP};
+	\node[box, color=TUMRed, fill=TUMRed!20, anchor=south west] (tls) at (tcp.north west) {TLS};
+	\node[box, color=TUMRed, fill=TUMRed!20, anchor=south west] (http2) at (tls.north west) {HTTP/2};
+
+	\node[box, color=TUMBlue, fill=TUMBlue!20, anchor=south east, minimum height=0.5*\rectheight] (udp) at (ip.north east) {UDP};
+	\node[box, color=TUMRed, fill=TUMRed!20, anchor=north east, minimum height=0.5*\rectheight] (http3) at (ip.east |- http2.north) {HTTP/3};
+	\node[box, color=TUMGreen, fill=TUMGreen!20, anchor=south east, minimum height=-2pt + 2*\rectheight] (quic) at (udp.north east) {QUIC};
+
+    \only<2->{
+    	\begin{pgfonlayer}{bg}
+			\coordinate (app) at ($(tls)!0.5!(http2)$);
+			\node[label] (network) at ($(ip.west) + (-.25, 0)$) {Network};
+			\node[label] (transport) at (network.east |- tcp) {Transport};
+			\node[label] (application) at (network.east |- app) {Application};
+
+			\coordinate (line1) at ($(ip)!0.5!(tcp)$);
+			\coordinate (line2) at ($(tcp)!0.5!(tls)$);
+
+			\draw[TUMDarkGray,dashed,line width=1pt] (application.west |- line1) -- (ip.east |- line1);
+			\draw[TUMDarkGray,dashed,line width=1pt] (application.west |- line2) -- (ip.east |- line2);
+		\end{pgfonlayer}
+	}
+
+	\end{tikzpicture}
+\end{standaloneframe}
+\end{document}
