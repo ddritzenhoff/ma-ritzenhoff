@@ -88,7 +88,6 @@
         \item Patch MsQuic\footnote{https://github.com/microsoft/msquic} to support AF\_XDP
         \item Run throughput tests in a client-server topology
         \item 20 iterations with 8GB file size
-        \item Generate Flame Graphs\footnote{https://www.brendangregg.com/flamegraphs.html} to identify bottlenecks
     \end{itemize}
     \begin{figure}
         \centering
@@ -98,24 +97,24 @@
     \end{figure}
 \end{frame}
 
-\section{Optimization}
-\begin{frame}
-    Optimized datapath initialization time (3s in perf trace) by configuring UMEM for a single queue on one interface
-    \begin{figure}
-        \centering
-        \includegraphics[width=1\textwidth]{pics/DataPathInitialize_beforeOpt.png}
-        \label{fig31}
-    \end{figure}
-\end{frame}
+% \section{Optimization}
+% \begin{frame}
+%     Optimized datapath initialization time (3s in perf trace) by configuring UMEM for a single queue on one interface
+%     \begin{figure}
+%         \centering
+%         \includegraphics[width=1\textwidth]{pics/DataPathInitialize_beforeOpt.png}
+%         \label{fig31}
+%     \end{figure}
+% \end{frame}
 
-\section{Optimization}
-\begin{frame}
-    \begin{figure}
-        \centering
-        \includegraphics[width=1\textwidth]{pics/DataPathInitialize_afterOpt.png}
-        \label{fig32}
-    \end{figure}
-\end{frame}
+% \section{Optimization}
+% \begin{frame}
+%     \begin{figure}
+%         \centering
+%         \includegraphics[width=1\textwidth]{pics/DataPathInitialize_afterOpt.png}
+%         \label{fig32}
+%     \end{figure}
+% \end{frame}
 
 \section{Measurements}
 \begin{frame}
@@ -169,18 +168,18 @@
     \end{figure}
 \end{frame}
 
-\section{GRO for XDP}
-\begin{frame}
-    \begin{itemize}
-        \item Fragmentation with XDP now supported by some NIC drivers\footnote{https://github.com/torvalds/linux/commit/f52ac7028bec22e925c8fece4f21641eb13b4d6f}\nocite{torvalds2021xdp}
-        \item \texttt{rx-gro-hw} with XDP\_DRV or GRO with XDP\_SKB when HW offload not available
-    \end{itemize}
-    \begin{figure}
-        \centering
-        \includegraphics[width=.60\textwidth]{pics/gro_offload_simplified.pdf}
-        \label{fig8}
-    \end{figure}
-\end{frame}
+% \section{GRO for XDP}
+% \begin{frame}
+%     \begin{itemize}
+%         \item Fragmentation with XDP now supported by some NIC drivers\footnote{https://github.com/torvalds/linux/commit/f52ac7028bec22e925c8fece4f21641eb13b4d6f}\nocite{torvalds2021xdp}
+%         \item \texttt{rx-gro-hw} with XDP\_DRV or GRO with XDP\_SKB when HW offload not available
+%     \end{itemize}
+%     \begin{figure}
+%         \centering
+%         \includegraphics[width=.60\textwidth]{pics/gro_offload_simplified.pdf}
+%         \label{fig8}
+%     \end{figure}
+% \end{frame}
 
 \section{Related Work}
 \begin{frame}
@@ -202,8 +201,7 @@
 \begin{frame}
     \begin{itemize}
         \item AF\_XDP is not able to achieve a higher throughput over recvmmsg()+GRO
-        \item XDP fragmentation support enables AF\_XDP+GRO to further increase performance
-        \item AF\_XDP skipping the network stack may benefit latency
+        \item XDP fragmentation support enables AF\_XDP+GRO to potentially further increase performance
         \item AF\_XDP represents one of many methods to reduce packet IO, each with its strengths and weaknesses
     \end{itemize}
 \end{frame}
