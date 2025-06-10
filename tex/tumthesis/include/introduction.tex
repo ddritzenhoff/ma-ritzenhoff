@@ -1,0 +1,26 @@
+\chapter{Introduction}
+\label{chap:introduction}
+
+Building on elements from TCP~\cite{rfc9293} and TLS~\cite{rfc8446}, QUIC~\cite{rfc9000} is a general-purpose transport protocol developed on top of UDP, which offers several advantages over the TCP+TLS stack. Its key differentiators include built-in security by incorporating TLS within the protocol, reduced round trips for data transmission due to combining the connection establishment and secure channel steps into one round trip, the mitigation of TCP's head-of-line blocking, and extensibility via user-space implementations. Such capabilities position QUIC as an ideal underpinning for protocols like the \ac{HTTP/3}~\cite{rfc9114}, which already powers 20.5\% of the world's HTTP traffic~\cite{cloudflare2024}. This growing prevalence also underscores the imperative to optimize QUIC's performance. Seen in Jaeger et al.~\cite{quic_on_the_highway}, packet I/O represents the most significant bottleneck to QUIC's maximum achievable throughput, and it highlights the unique challenges QUIC faces being a user space protocol due to the inherent costs of context switches and there being fewer mature optimizations and offloads than TCP.
+
+\ac{XDP} is a high performance data path in the Linux kernel based on the extended Berkeley Packet Filter (eBPF) runtime, and offers a way to reduce packet I/O. First introduced in 2016~\cite{linux_xdp_merge_2016}, \ac{XDP} works by attaching a hook into the network receive (RX) path, which can be used to handle packets at the earliest possible time, before any other work is done. With AF\_XDP, a socket type, it is also possible to send raw layer 2 frames directly to the user space QUIC implementations from the \ac{XDP} hook point. At the cost of some additional header processing in user space, AF\_XDP allows the packets to skip the Linux network stack entirely.
+
+While maximizing throughput by reducing packet I/O is an important goal, many applications are also latency-sensitive. Consequently, we look at the time difference a packet requires to traverse from the NIC to user space using XDP and the already-optimized default data path present in MsQuic using \ac{PTP} for nanosecond resolution.
+
+Finally, it must be noted that \ac{XDP} represents just one way to reduce packet I/O. An alternative is DPDK~\cite{dpdk}, which is a software framework providing a set of data plane libraries and NIC polling-mode drivers to offload all packet processing from kernel space into user space. Another alternative is in-kernel QUIC~\cite{quic_lxin} which moves QUIC from user space into kernel space. Each technology offers different benefits and drawbacks, which highlights the need to create a taxonomy in which we evaluate these QUIC optimizations, organizing each based on implementation complexity, performance improvement potential, unwanted side effects, flexibility, privilege level usage, and dynamic vs. static loading.
+
+\textbf{TODO: run network measurements to get an idea of the efficiency of all these protocols}
+
+\section{Research Questions}
+\label{sec:research-questions}
+
+In this thesis, we answer the following research questions:
+
+\textbf{To what extent can we increase QUIC performance by using XDP in a trivial way? Is there optimization potential?} We interpret performance as both maximizing throughput and minimizing latency. MsQuic is used for this research as it sets the bar high with its optimized default data path, which enables it to have one of the highest throughputs out of any QUIC implementation~\cite{spaeth2023}. Moreover, it is one of the few implementations to offer rudimentary support for \ac{XDP}. A thorough understanding of XDP's performance may therefore serve as a guide for other QUIC implementations that are looking to become more optimized in both throughput and latency.
+
+\textbf{Can a taxonomy be created for QUIC optimizations, categorizing them by implementation complexity, performance improvement potential, unwanted side effects, flexibility, privilege level usage, and dynamic vs. static loading?} As previously alluded to, there exist multiple methods to reduce packet I/O within QUIC. Each method presents its own set of tradeoffs with respect to the concepts introduced in the research question. Elaborating on each concept will give deeper insight when it is appropriate to use each technology.
+
+\section{Outline}
+\label{sec:outline}
+
+In Chapter~\ref{chap:background}, we provide additional context on the QUIC protocol, \ac{XDP}, AF\_XDP, the POS measurement framework used to gather throughput and latency data, MsQuic and its default data path optimizations, and \ac{PTP}. Chapter~\ref{chap:implementation} describes the changes made to MsQuic and POS in order to enable our measurements. We also describe what we measured and our procedure for doing so. Chapter~\ref{chap:evaluation} investigates the results of our measurements and offers explanations for them. Finally. Chapter~\ref{chap:related-work} investigates other relevant work, and Chapter~\ref{chap:conclusion} summarizes our findings and provides an outline for future work. 
