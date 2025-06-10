@@ -1,3 +1,6 @@
+# Dominik's personal additions
+**/.DS_Store
+
 build/
 venv/
 *.tar.gz
