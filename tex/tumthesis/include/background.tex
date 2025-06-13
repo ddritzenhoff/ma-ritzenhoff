@@ -93,19 +93,96 @@ While powerful, \ac{eBPF} isn't a silver bullet. Its capabilities remain signifi
 \section{XDP}
 \label{sec:xdp}
 
-\ac{XDP} is a \ac{BPF} hook point early in the network receive path and triggers a run of the \ac{BPF} program for every packet reception. Seen in Figure~\ref{fig:xdp-hook-point}, there exist two \ac{XDP} hook points: \texttt{XDP\_DRV} and \texttt{XDP\_SKB}. The former represents the earliest possible point at which a packet may be processed in software and requires integration within the network driver. The latter represents the earliest point at which a packet may be processed without driver support. 
+\ac{XDP} is a hook point situated very early in the network receive path, and it allows a loaded \ac{BPF} program to be invoked for every packet. Seen in Figure~\ref{fig:xdp-receive-path}, there are two \ac{XDP} hook points: \texttt{XDP\_DRV} and \texttt{XDP\_SKB}. The former represents the earliest point at which a packet may be processed in software, but it comes with the cost of requiring integration into the network driver. When this is not an option, \texttt{XDP\_SKB} offers a generic hook point which functions for every setup, but requires additional per-packet processing.
 
-Figure~\ref{fig:xdp-hook-point}
+One stipulation to loading an \ac{XDP} program is that it may only be attached to a single queue on a specific \ac{NIC}. This is an important consideration as packet steering mechanisms like \ac{RSS} are often used to distribute different flows across the queues of a particular \ac{NIC}. Therefore, to capture all relevant traffic, it is crucial to either attach the program to every single queue or to combine the queues together using a command like \texttt{sudo ethtool -L <interface\_name> combined <number\_of\_queues>}. This directs the \ac{NIC} to use a specified number of combined receive and transmit queues.
 
 \begin{figure}
 	\centering
-	\includegraphics[width=.5\linewidth]{pics/xdp_hook_point}
+	\includegraphics[width=.85\linewidth]{pics/xdp_receive_path}
 	\caption{XDP Hook Points}
-	\label{fig:xdp-hook-point}
+	\label{fig:xdp-receive-path}
 \end{figure}
+
+\subsection{xdp\_md}
+\label{subsec:xdp-md}
+Upon entry of every single \texttt{XDP\_DRV} program, a struct \texttt{xdp\_md} is passed as an argument, providing essential information about the packet. Listing~\ref{lst:xdp-md} shows the struct's definition, which contains pointers to the beginning and end of the data as well as the index of the network interface on which the packet was received, the receive queue that handled the packet, and a metadata field where network drivers or \ac{XDP} programs can store custom information associated with the packet. As seen in Figure~\ref{fig:xdp-receive-path}, an \texttt{sk\_buff} has not yet been allocated, which is the reason for having less metadata available.
+
+\begin{lstlisting}[caption={The xdp\_md struct}, label={lst:xdp-md}]
+struct xdp_md {
+	__u32 data;
+	__u32 data_end;
+	__u32 data_meta;
+	/* Below access go through struct xdp_rxq_info */
+	__u32 ingress_ifindex; /* rxq->dev->ifindex */
+	__u32 rx_queue_index;  /* rxq->queue_index  */
+	__u32 egress_ifindex;  /* txq->dev->ifindex */
+};
+\end{lstlisting}
+
+
+\subsection{sk\_buff}
+\label{subsec:sk-buff}
+The \texttt{sk\_buff} struct, which stands for socket buffer, and whose definition can be seen in Listing~\ref{lst:sk-buff}, is the central data structure to represent a network packet as it traverses through the Linux network stack. This replaces the \texttt{xdp\_md} struct for \texttt{XDP\_SKB} programs. Created by the \ac{NIC} driver, the \texttt{sk\_buff} encapsulates the raw packet data and associated metadata such as pointers to the different protocol headers, the network interface on which the packet arrived, flags, and the length of the packet. It is used by every networking layer from the driver through to IP routing, firewalling, transport layers, and the user-space application's socket. It is designed to offer efficient in-kernel manipulation for operations like adding and stripping headers, splitting and merging packets, and supporting zero-copy. The \texttt{XDP\_SKB} hook as seen in Figure~\ref{fig:xdp-receive-path} is invoked after such an \texttt{sk\_buff} has been created.
+
+\begin{lstlisting}[caption={The sk\_buff struct}, label={lst:sk-buff}]
+type block struct {
+	struct sk_buff {
+        union {unnamed_union};
+        __u16 inner_transport_header;
+        __u16 inner_network_header;
+        __u16 inner_mac_header;
+        __be16 protocol;
+        __u16 transport_header;
+        __u16 network_header;
+        __u16 mac_header;
+        sk_buff_data_t tail;
+        sk_buff_data_t end;
+        unsigned char * head;
+        unsigned char * data;
+        unsigned int truesize;
+        atomic_t users;
+    };  
+}
+\end{lstlisting}
+
+\subsection{XDP Actions}
+\label{subsec:xdp-actions}
+Once an \ac{eBPF} program has finished running within the XDP hook, it must return one of a few predefined actions, which then instruct the kernel on how to proceed. Table~\ref{tab:xdp_actions} shows the six different possible return codes. For instance, if a program's sole purpose is to gather statistics on packets traversing a specific queue and \ac{NIC}, \texttt{XDP\_PASS} offers a non-intrusive approach, allowing the packet to continue its journey up the network stack as usual. Alternatively, if a program aims to discard irrelevant packets, perhaps based on a packet's source IP within a \ac{DDoS} mitigation tool, \texttt{XDP\_DROP} represents one of the earliest and cheapest ways to reduce the load on the system from malicious packets. \texttt{XDP\_ABORTED} functions similarly to \texttt{XDP\_DROP} but with the additional caveat that an error has occurred. For scenarios like load balancing that distribute traffic across multiple machines, \texttt{XDP\_TX} is highly effective in that it sends the packet back out the same interface it arrived at. Finally, \texttt{XDP\_REDIRECT} can be used for layer 3 routing or in a special case, sending the raw layer 2 frame directly to user space, thereby skipping the network stack entirely.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l p{10cm}}
+        \toprule
+        XDP Action & Description \\
+        \midrule
+        \texttt{XDP\_PASS} & Allows the packet to continue its journey through the normal network stack for further processing. \\
+        \texttt{XDP\_DROP} & Immediately drops the packet at the earliest possible point, preventing it from consuming further kernel resources. \\
+        \texttt{XDP\_ABORTED} & Indicates an error or that an exception occurred within the XDP program, leading to the packet being dropped. This is similar to \texttt{XDP\_DROP} but signals a problem. \\
+        \texttt{XDP\_TX} & Transmits the packet back out of the same network interface it arrived on. This is often used for fast replies or packet reflection. \\
+        \texttt{XDP\_REDIRECT} & Redirects the packet to a different network interface or to an \texttt{AF\_XDP} socket in user space. This enables fast packet steering. \\
+        \bottomrule
+    \end{tabular}
+    \caption{XDP Program Return Actions}
+    \label{tab:xdp_actions}
+\end{table}
 
 \section{AF\_XDP}
 \label{sec:afxdp}
+
+
+
+\section{XDP Enhancements}
+\label{sec:xdp-enhancements}
+
+\subsection{Zero Copy}
+\label{subsec:zero-copy}
+
+\subsection{XDP Driver and XDP Generic}
+\label{subsec:xdp-driver-and-xdp-generic}
+
+\subsection{XDP Hardware Offload}
+\label{subsec:xdp-hardware-offload}
 
 \section{MsQuic}
 \label{sec:msquic}
