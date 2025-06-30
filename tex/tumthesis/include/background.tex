@@ -6,12 +6,12 @@
 
 \section{eBPF}
 \label{sec:bpf}
-\ac{eBPF}, also simply known as \ac{BPF}, is a Linux-native in-kernel bytecode language and virtual machine that allows for programmable, event-driven execution across many of the kernel's subsystems. It represents an evolution from \ac{cBPF}, which also offers an in-kernel bytecode language and virtual machine but with fewer capabilities. The work flow for creating an \ac{eBPF} program typically entails writing the program in a subset of C, compiling it using a tool like LLVM, writing the user space loader program, and finally loading and attaching the program. Once a specific event occurs, the \ac{eBPF} program will subsequently be invoked. Finally, because it is a Linux-native technology, \ac{BPF} comes packaged with every kernel version since 3.18~\cite{starovoitov2014bpf}.
+\ac{eBPF}, also simply known as \ac{BPF}, is a Linux-native in-kernel bytecode language and virtual machine that allows for programmable, event-driven execution across many of the kernel's subsystems. It represents an evolution from \ac{cBPF}, which also offers an in-kernel bytecode language and virtual machine but with fewer capabilities. The work flow for creating an \ac{eBPF} program typically entails writing the program in a subset of C, compiling it using a tool like LLVM, writing the userspace loader program, and finally loading and attaching the program. Once a specific event occurs, the \ac{eBPF} program will subsequently be invoked. Finally, because it is a Linux-native technology, \ac{BPF} comes packaged with every kernel version since 3.18~\cite{starovoitov2014bpf}.
 
 \subsection{Instruction Set}
 \label{subsec:instruction-set}
 \ac{BPF} is a general purpose \ac{RISC} architecture which can be used as a compilation target for
-compiler back ends like LLVM. Typically written in a subset of C that does not allow features such as arbitrary loops, unbounded recursion, and arbitrary memory accesses, \ac{BPF} bytecode is loaded by the kernel at runtime and is later \ac{JIT} compiled into native opcodes for better performance. This approach allows the kernel to become programmable without having to cross the user-kernel space boundary. This is incredibly advantageous because it offers a flexible new way of gaining visibility into the Linux kernel as well as boosting data path performance by enabling data handling at the earliest possible stages. Moreover, BPF programs can be atomically updated at runtime without requiring a kernel restart, allowing for dynamic changes throughout a program's lifecycle.
+compiler back ends. Typically written in a subset of C that does not allow features such as arbitrary loops, unbounded recursion, and arbitrary memory accesses, \ac{BPF} bytecode is loaded by the kernel at runtime and is later \ac{JIT} compiled into native opcodes for better performance. This approach allows the kernel to become programmable without having to cross the user-kernel space boundary. This is incredibly advantageous because it offers a flexible new way of gaining visibility into the Linux kernel as well as boosting data path performance by enabling data handling at the earliest possible stages. Moreover, BPF programs can be atomically updated at runtime without requiring a kernel restart, allowing for dynamic changes throughout a program's lifecycle.
 
 \ac{BPF} consists of eleven 64 bit registers with 32 bit subregisters. It also contains a 512 byte stack space and a program counter. Each of the eleven registers are named \texttt{r0 - r10}, and the default operating mode is 64 bits. The 32 bit subregisters are only accessible through ALU operations. Table~\ref{tab:ebpf_registers} shows the BPF calling convention.
 
@@ -39,7 +39,7 @@ Depending on the hook point, a given \ac{eBPF} program will have access to a num
 
 \subsection{Maps}
 \label{subsec:ebpf-maps}
-\ac{eBPF} maps represent the way information is passed between the \ac{eBPF} program and user space application. They are key-value stores that live inside the kernel and are the data structure typically used for managing state within \ac{eBPF} programs. They also allow data to persist across multiple program executions. As seen within Figure~\ref{fig:bpf-map}, processes in user space access maps through file descriptors, and a map may also be shared between multiple processes and \ac{BPF} programs.
+\ac{eBPF} maps represent the way information is passed between the \ac{eBPF} program and userspace application. They are key-value stores that live inside the kernel and are the data structure typically used for managing state within \ac{eBPF} programs. They also allow data to persist across multiple program executions. As seen within Figure~\ref{fig:bpf-map}, processes in userspace access maps through file descriptors, and a map may also be shared between multiple processes and \ac{BPF} programs.
 
 \begin{figure}
 	\centering
@@ -77,9 +77,9 @@ There are also many map types available as seen in Table~\ref{tab:generic_ebpf_m
         \midrule
         \texttt{BPF\_MAP\_TYPE\_XSKMAP} & An array used by XDP programs to redirect network packets to AF\_XDP sockets. \\
         \texttt{BPF\_MAP\_TYPE\_PROG\_ARRAY} & An array that holds pointers to other eBPF programs. Used for complex control flow or "tail calls". \\
-        \texttt{BPF\_MAP\_TYPE\_PERF\_EVENT\_ARRAY} & Used for sending data from eBPF programs to user space via the \texttt{perf} subsystem. \\
+        \texttt{BPF\_MAP\_TYPE\_PERF\_EVENT\_ARRAY} & Used for sending data from eBPF programs to userspace via the \texttt{perf} subsystem's ring buffers. \\
         \texttt{BPF\_MAP\_TYPE\_CGROUP\_ARRAY} & Used to manage BPF programs attached to cgroups. \\
-        \texttt{BPF\_MAP\_TYPE\_STACK\_TRACE} & Captures kernel or user space stack traces for profiling and debugging. \\
+        \texttt{BPF\_MAP\_TYPE\_STACK\_TRACE} & Captures kernel or userspace stack traces for profiling and debugging. \\
         \texttt{BPF\_MAP\_TYPE\_ARRAY\_OF\_MAPS} \newline \texttt{BPF\_MAP\_TYPE\_HASH\_OF\_MAPS} & Maps that hold pointers to other maps, allowing for atomic replacement of entire maps at runtime. \\
         \bottomrule
     \end{tabular}
@@ -88,7 +88,7 @@ There are also many map types available as seen in Table~\ref{tab:generic_ebpf_m
 \end{table}
 
 \subsection{Limitations}
-While powerful, \ac{eBPF} isn't a silver bullet. Its capabilities remain significantly more constrained than those of a typical user space application. For example, it doesn't support function calls with six or more arguments, the strict verifier might reject a program if it can't definitively prove termination, and \ac{eBPF} programs have access to only a very limited set of helper functions and a small stack size. Finally, debugging is basic. It is currently not possible to step through an \ac{eBPF} program while it runs in the kernel, which consequently makes print debugging the most effective method. For most use cases, user space applications are still the most viable option.
+While powerful, \ac{eBPF} isn't a silver bullet. Its capabilities remain significantly more constrained than those of a typical userspace application. For example, it doesn't support function calls with six or more arguments, the strict verifier might reject a program if it can't definitively prove termination, and \ac{eBPF} programs have access to only a very limited set of helper functions and a small stack size. Finally, debugging is basic. It is currently not possible to step through an \ac{eBPF} program while it runs in the kernel, which consequently makes print debugging the most effective method. For most use cases, userspace applications are still the most viable option.
 
 \section{XDP}
 \label{sec:xdp}
@@ -123,7 +123,7 @@ struct xdp_md {
 
 \subsection{sk\_buff}
 \label{subsec:sk-buff}
-The \texttt{sk\_buff} struct, which stands for socket buffer, and whose definition can be seen in Listing~\ref{lst:sk-buff}, is the central data structure to represent a network packet as it traverses through the Linux network stack. This replaces the \texttt{xdp\_md} struct for \texttt{XDP\_SKB} programs. Created by the \ac{NIC} driver, the \texttt{sk\_buff} encapsulates the raw packet data and associated metadata such as pointers to the different protocol headers, the network interface on which the packet arrived, flags, and the length of the packet. It is used by every networking layer from the driver through to IP routing, firewalling, transport layers, and the user-space application's socket. It is designed to offer efficient in-kernel manipulation for operations like adding and stripping headers, splitting and merging packets, and supporting zero-copy. The \texttt{XDP\_SKB} hook as seen in Figure~\ref{fig:xdp-receive-path} is invoked after such an \texttt{sk\_buff} has been created.
+The \texttt{sk\_buff} struct, which stands for socket buffer, and whose definition can be seen in Listing~\ref{lst:sk-buff}, is the central data structure representing a network packet as it traverses through the Linux network stack. The \texttt{XDP\_SKB} hook as seen in Figure~\ref{fig:xdp-receive-path} is invoked after such an \texttt{sk\_buff} has been created and thus replaces the \texttt{xdp\_md} struct for an \texttt{sk\_buff}. Created by the \ac{NIC} driver, the \texttt{sk\_buff} encapsulates the raw packet data and associated metadata such as pointers to the different protocol headers, the network interface on which the packet arrived, flags, and the length of the packet. It is used by every networking layer from the driver through to IP routing, firewalling, transport layers, and the user-space application's socket. It is designed to offer efficient in-kernel manipulation for operations like adding and stripping headers, and splitting and merging packets.
 
 \begin{lstlisting}[caption={The sk\_buff struct}, label={lst:sk-buff}]
 type block struct {
@@ -148,7 +148,7 @@ type block struct {
 
 \subsection{XDP Actions}
 \label{subsec:xdp-actions}
-Once an \ac{eBPF} program has finished running within the XDP hook, it must return one of a few predefined actions, which then instruct the kernel on how to proceed. Table~\ref{tab:xdp_actions} shows the six different possible return codes. For instance, if a program's sole purpose is to gather statistics on packets traversing a specific queue and \ac{NIC}, \texttt{XDP\_PASS} offers a non-intrusive approach, allowing the packet to continue its journey up the network stack as usual. Alternatively, if a program aims to discard irrelevant packets, perhaps based on a packet's source IP within a \ac{DDoS} mitigation tool, \texttt{XDP\_DROP} represents one of the earliest and cheapest ways to reduce the load on the system from malicious packets. \texttt{XDP\_ABORTED} functions similarly to \texttt{XDP\_DROP} but with the additional caveat that an error has occurred. For scenarios like load balancing that distribute traffic across multiple machines, \texttt{XDP\_TX} is highly effective in that it sends the packet back out the same interface it arrived at. Finally, \texttt{XDP\_REDIRECT} can be used for layer 3 routing or in a special case, sending the raw layer 2 frame directly to user space, thereby skipping the network stack entirely.
+Once an \ac{eBPF} program has finished running within the XDP hook, it must return one of a few predefined actions, which then instruct the kernel on how to proceed. Table~\ref{tab:xdp_actions} shows the six different possible return codes. For instance, if a program's sole purpose is to gather statistics on packets traversing a specific queue and \ac{NIC}, \texttt{XDP\_PASS} offers a non-intrusive approach, allowing the packet to continue its journey up the network stack as usual. Alternatively, if a program aims to discard irrelevant packets, perhaps based on a packet's source IP within a \ac{DDoS} mitigation tool, \texttt{XDP\_DROP} represents one of the earliest and cheapest ways to reduce the load on the system from malicious packets. \texttt{XDP\_ABORTED} functions similarly to \texttt{XDP\_DROP} but with the additional caveat that an error has occurred. For scenarios like load balancing that distribute traffic across multiple machines, \texttt{XDP\_TX} is highly effective in that it sends the packet back out the same interface it arrived at. Finally, \texttt{XDP\_REDIRECT} can be used for layer 3 routing or in a special case, sending the raw layer 2 frame directly to userspace, thereby skipping the network stack entirely.
 
 \begin{table}[h]
     \centering
@@ -160,7 +160,7 @@ Once an \ac{eBPF} program has finished running within the XDP hook, it must retu
         \texttt{XDP\_DROP} & Immediately drops the packet at the earliest possible point, preventing it from consuming further kernel resources. \\
         \texttt{XDP\_ABORTED} & Indicates an error or that an exception occurred within the XDP program, leading to the packet being dropped. This is similar to \texttt{XDP\_DROP} but signals a problem. \\
         \texttt{XDP\_TX} & Transmits the packet back out of the same network interface it arrived on. This is often used for fast replies or packet reflection. \\
-        \texttt{XDP\_REDIRECT} & Redirects the packet to a different network interface or to an \texttt{AF\_XDP} socket in user space. This enables fast packet steering. \\
+        \texttt{XDP\_REDIRECT} & Redirects the packet to a different network interface or to an \texttt{AF\_XDP} socket in userspace. This enables fast packet steering. \\
         \bottomrule
     \end{tabular}
     \caption{XDP Program Return Actions}
@@ -168,21 +168,81 @@ Once an \ac{eBPF} program has finished running within the XDP hook, it must retu
 \end{table}
 
 \section{AF\_XDP}
-\label{sec:afxdp}
+\label{sec:af-xdp}
+Table~\ref{tab:xdp_actions} highlights the versatility of \texttt{XDP\_REDIRECT}. Beyond directing packets to other interfaces, it offers a powerful mechanism to send them directly to userspace. This capability is particularly beneficial for performance-sensitive protocols such as QUIC, because it completely bypasses the traditional kernel network stack, thereby eliminating its associated overhead. Achieving this direct delivery requires a userspace application to utilize an \texttt{AF\_XDP} socket.
 
+\subsection{Setting up an AF\_XDP Socket}
+\label{subsec:af-xdp-socket}
+After an application establishes its \texttt{AF\_XDP} socket through the socket(2) system call, the next step is to set aside a special memory area for incoming packets. This area is called the UMEM region. When creating UMEM, two primary considerations come into play.
 
+First, there's deciding on the size of each "chunk" within this region. Since each chunk holds one packet, it must be large enough for the biggest packet an application anticipates, but not so large that it wastes significant memory. The Linux kernel requires this chunk size to be a power of two, falling between 2048 bytes and the system's page size (which is often 4096 bytes, making 2048 or 4096 byte chunks common).
 
-\section{XDP Enhancements}
-\label{sec:xdp-enhancements}
+Second, the total number of chunks must be determined. If this number is too small, there is a risk of the UMEM region filling up and packets being dropped. However, making it too large simply consumes excess memory. Unfortunately, there is no magic formula here; the ideal number of chunks is entirely specific to an application's unique needs.
 
-\subsection{Zero Copy}
+Once this entire setup is complete, the result is effectively a large, contiguous block of memory that functions very much like an array, ready to receive packets.
+
+Once the UMEM region is configured, the application must establish a communication channel between the kernel (i.e., the \ac{eBPF} program) and userspace. This is achieved using ring buffers, which are fixed-size, pre-allocated circular buffers. Their circular nature means that once full, new data overwrites the oldest existing data, rather than requiring reallocation or copying. Ring buffers are frequently employed in single-producer, single-consumer contexts to enable lockless operations. Consequently, it is imperative that the consumer's processing speed surpasses the producer's rate to avoid data overwrites and potential loss.
+
+Immediately after allocating the UMEM region, the userspace process contains ownership over all the chunks. This is represented in Figure~\ref{fig:umem-after-initialization}. 
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.90\linewidth]{pics/umem-1}
+	\caption{UMEM After Initialization}
+	\label{fig:umem-after-initialization}
+\end{figure}
+
+Next, to enable seamless packet transfer between userspace and the kernel, four distinct ring buffers are initialized: the \texttt{Transmit (TX) queue}, \texttt{Receive (RX) queue}, \texttt{Completion queue}, and \texttt{Fill queue}.
+
+The userspace application then yields ownership of a specified number of UMEM chunks to the kernel, preparing them to receive incoming packets. This is achieved by generating descriptors, each uniquely pointing to a UMEM chunk, and enqueuing them into the \texttt{Fill queue} (as depicted in Figure~\ref{fig:umem-owned-by-fill-queue}). Subsequently, the kernel can then retrieve these descriptors and use the associated UMEM chunks to store packets as they arrive from the NIC (this process is illustrated in Figure~\ref{fig:umem-owned-by-kernel}).
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.90\linewidth]{pics/umem-2}
+	\caption{UMEM Chunks Owned by Fill Queue}
+	\label{fig:umem-owned-by-fill-queue}
+\end{figure}
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.90\linewidth]{pics/umem-3}
+	\caption{UMEM Chunks Owned by Kernel}
+	\label{fig:umem-owned-by-kernel}
+\end{figure}
+
+Once the packets have been copied into the UMEM chunks controlled by the kernel, it moves the descriptors to the \texttt{RX queue} as seen in Figure~\ref{fig:add-descs-to-fill-queue}. The process may then consume these packets.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.90\linewidth]{pics/umem-4}
+	\caption{Kernel Adds Descriptors to RX Queue}
+	\label{fig:add-descs-to-fill-queue}
+\end{figure}
+
+Once the kernel has consumed a descriptor from the RX queue, the userspace application updates the \texttt{RX queue}'s tail pointer and gains two options for handling the associated frame. First, it can return the descriptor to the \texttt{Fill queue}, effectively relinquishing control of the frame back to the kernel for future incoming packets. Alternatively, the application can populate the frame with its own data and add the descriptor to the \texttt{TX queue}. In this scenario, control passes to the kernel with the explicit intent of transmitting the packet out onto the network interface (as depicted in Figure~\ref{fig:add-desc-to-tx-queue}). Upon successful transmission, the kernel consumes the TX descriptor and signals completion by adding a new descriptor to the \texttt{Completion queue}.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.90\linewidth]{pics/umem-5}
+	\caption{Process Adds Descriptor to TX Queue}
+	\label{fig:add-desc-to-tx-queue}
+\end{figure}
+
+Throughout the lifetime of the process, this interplay of constantly consuming and producing descriptors on the ring buffers enables the transmission and reception of packets with minimal locking and low system call overhead due to the nature of batch sending and receiving the descriptors. Given that packet I/O is the greatest limiting factor to QUIC performance, AF\_XDP therefore offers an attractive value proposition with its cheap packet delivery.
+
+\subsection{XDP Options}
+\label{subsec:xdp-options}
+Despite AF\_XDP being a relatively new technology, there are a number of available features to change and enhance the way it functions.
+
+\subsubsection{Zero Copy}
 \label{subsec:zero-copy}
+By default, when a packet arrives at the \ac{NIC}, the traditional kernel receive path involves copying the incoming data into a buffer within the RX ring, as depicted in Figure~\ref{fig:xdp-receive-path}. When AF\_XDP is active without specific optimizations, the network driver then has to perform a second copy, moving this packet data from the kernel's buffer into a UMEM frame. This double-copy operation introduces noticeable overhead, consuming both CPU cycles and memory bandwidth.
 
-\subsection{XDP Driver and XDP Generic}
-\label{subsec:xdp-driver-and-xdp-generic}
+However, this costly double-copy can be entirely bypassed by enabling zero-copy mode. This is achieved by passing the \texttt{XDP\_ZEROCOPY} flag to the \texttt{bind(2)} syscall when an \ac{XSK} binds with a queue on the NIC. With zero-copy enabled, the \ac{NIC} is instructed to directly place the incoming Layer 2 packet into a UMEM frame. This means the packet data never needs to be copied into an intermediate kernel buffer, resulting in significantly reduced latency, lower CPU utilization, and higher packet throughput. It is important to note however, that the success of zero-copy depends on the network driver's support and the NIC's capabilities, as it requires direct interaction between the hardware and the UMEM region.
 
-\subsection{XDP Hardware Offload}
+\subsubsection{XDP Hardware Offload}
 \label{subsec:xdp-hardware-offload}
+In the effort to minimize load on the CPU, it has now also become possible to offload an XDP program to the \ac{NIC}. Pioneered by Netronome, their SmartNIC is able to directly ingest the \ac{eBPF} bytecode of an \ac{XDP} program, compile it to the native instruction set, and execute the logic before the packet reaches the host CPU's memory as shown in Kicinski et. al~\cite{Kicinski2017XDP}. The implication of such a change is a reduction in latency and an increase in throughput. This is largely due to eliminating the need for costly \ac{DMA} transfers into kernel memory and avoiding the traditional hardware interrupt path.
 
 \section{MsQuic}
 \label{sec:msquic}
