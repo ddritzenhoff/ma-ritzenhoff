@@ -1,8 +1,80 @@
 \chapter{Background}
 \label{chap:background}
+This chapter lays the groundwork for our investigations by covering several key areas. We first provide foundational information on the QUIC protocol by comparing it to \ac{TCP}. Subsequently, we cover \ac{eBPF} and \ac{XDP}, followed by an introduction to \ac{PTP}, and finally, an overview of the \ac{QIR} framework.
 
-\section{The QUIC Protocol}
+\section{A TCP and QUIC Comparison}
 \label{sec:the-quic-protocol}
+QUIC~\cite{rfc9000} is a next-generation transport protocol developed to address the inherent limitations of protocols like \ac{TCP} and \ac{TLS}. It offers several key advantages: a combined transport and cryptographic handshake for faster connection establishment, native stream multiplexing to prevent head-of-line blocking and improve throughput resilience to packet loss, robust connection migration for seamless transitions between networks, and easier deployment.
+
+Google, the original developer of QUIC, was already serving 50\% of all requests to Google services from Chrome browsers over QUIC by 2015~\cite{chromium_quic_2015}. Today, \ac{HTTP/3}, which uses QUIC, is enabled by default on Chrome browsers~\cite{chromium_quicer_2024}. These statistics underscore the protocol's clear benefits and its widespread adoption across the Internet. Figure~\ref{fig:network-stacks} illustrates the respective technology stacks of \ac{HTTP/3} and its predecessor, \ac{HTTP/2}. The following paragraphs dive deeper into implications of such changes.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.50\linewidth]{pics/quic-stack}
+	\caption{HTTP/2 and HTTP/3 Network Stacks}
+	\label{fig:network-stacks}
+\end{figure}
+
+\subsection{Head-of-Line Blocking}
+\label{subsec:hol-blocking}
+QUIC was specifically designed to overcome several of \ac{TCP}'s inherent shortcomings, most notably \ac{HoL} blocking. Similar to QUIC, \ac{TCP}'s design mandates the in-order delivery of packets within a single connection. However, the problem in \ac{TCP} arises when even a single packet is delayed or dropped en-route. For higher-level protocols like \ac{HTTP/2} that build off \ac{TCP}, this means all subsequent packets are forced to wait for the retransmission of the lost packet, irrespective of the application-level stream they belong to. Figure~\ref{fig:hol-blocking} illustrates this phenomenon. Consequently, this property makes \ac{HTTP/2} highly vulnerable to performance degradation from packet loss, especially when utilizing multiple streams. With QUIC, the concept of streams is native to the protocol itself, which lets \ac{HTTP/3} effectively multiplex without any risk of \ac{HoL} blocking.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.95\linewidth]{pics/hol-blocking}
+	\caption{TCP and QUIC Streams with Packet Loss. The TCP client will receive all packets from the three streams but packet 4, which went missing. Head-of-Line blocking ensures that the HTTP/2 client only receives packets 1, 2, and 3. Packet 4 must be resent for the client to receive any more. The QUIC client will receive all packets but packet 4. The HTTP/3 client will receive all packets but packets 4, 5, and 11. Only the packets from one stream are blocked.}
+	\label{fig:hol-blocking}
+\end{figure}
+
+\subsection{QUICer Feedback Loops}
+\label{subsec:slow-adoption-of-new-features}
+Integrating \ac{TCP}'s codebase directly within the operating system kernel, while beneficial for avoiding costly packet copying to userspace, introduces substantial drawbacks. This approach leads to a comparatively slow adoption rate for new features or bug fixes, and significantly raises the stakes for every code change. For any new \ac{TCP} enhancement to achieve widespread use, it requires all clients to upgrade their kernel versions to the one where the feature was introduced. This tight coupling creates brittleness for applications dependent on particular \ac{TCP} features, as they may not function correctly if paired with an outdated kernel. This contrasts sharply with protocols like QUIC, which operates in userspace and is integrated directly into the application itself. Consequently, updating QUIC is as simple as bundling the newest version of the QUIC library with the application code, thereby eliminating this brittleness entirely. Furthermore, userspace offers a more forgiving environment for experimentation. If a new algorithm or feature contains a bug, it is far less likely to crash the entire operating system than with \ac{TCP}, making development and testing safer and quicker.
+
+\subsection{Transport and Cryptographic Handshakes}
+\label{subsec:combined-transport-and-cryptographic-handshakes}
+With \ac{TCP}+\ac{TLS}, a round trip is needed to establish the \ac{TCP} connection, and another round trip is then required to make it secure. QUIC, however, integrates \ac{TLS} directly into its protocol, combining these two steps into a single handshake, as illustrated in Figure~\ref{fig:quic-tcp-handshakes}. This integration typically leads to a reduced time-to-first-byte. Additionally, in the special case that QUIC has previously communicated with a server, it can leverage cached cryptographic parameters and connection settings to transmit application data during the very first round-trip. This is known as \ac{0-RTT}. 
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.75\linewidth]{pics/quic-tcp-handshakes}
+	\caption{Handshake Comparison Between TCP and QUIC.}
+	\label{fig:quic-tcp-handshakes}
+\end{figure}
+
+\subsection{Security, Privacy, and Ossification}
+\label{subsec:security-and-privacy}
+Another downside to \ac{TLS} and \ac{TCP} is that they leave header information exposed to middleboxes. In fact, none of \ac{TCP}'s header components is encrypted. This exposure contributes to a larger attack surface area for malicious actors but also contributes to network ossification. Middleboxes can enforce outdated \ac{TCP} behaviors and hinder protocol evolution by overwriting visible values or by expecting specific field contents and dropping packets that don't adhear to them. In contrast, QUIC encrypts a substantial portion of its header fields, including the packet number, key phase, and reserved bits, making it far less susceptible to such issues. Even fields not fully encrypted, like the Connection ID, are integrity-protected. This design allows for immediate detection of packet tampering and severely impedes a \ac{MITM} attacker from altering values. While \ac{TCP} and \ac{TLS} technically also provide integrity protection by means of the checksum field, the checksum is a simple 1's complement sum, which is feasible for an attacker to recompute.
+
+To further combat ossification, QUIC also employs a technique known as greasing. One instance of such usage is with the 'QUIC Bit', which is the second most significant bit of the first byte in every QUIC packet. While this bit is typically fixed and is used to aid in protocol identification, QUIC endpoints may negotiate using the grease\_quic\_bit transport parameter to send an arbitrary value instead~\cite{rfc9287}. This consequently encourages middleboxes to tolerate unknown or future extensions rather than relying on a static value.
+
+\subsection{Connection Migration}
+\label{subsec:connection-migration}
+Unlike \ac{TCP}, which binds connections to the source and destination IP addresses and ports, QUIC maintains connections with a \ac{CID}. The advantage is that it allows QUIC to migrate across underlying network changes, such as from Wi-Fi to cellular data, without needing to re-establish the entire connection, as is the case for \ac{TCP}. Even when the source IP changes, the client may continue using the same \ac{CID}. This is especially useful for mobile environments given the almost ubiquitous support of both Wi-Fi and cellular.
+
+\subsection{Packet Ambiguity}
+\label{subsec:packet-ambiguity}
+When a packet goes missing in \ac{TCP}, a retransmission from the server to the client carries the same sequence number and data as the original. This introduces ambiguity, making it difficult to discern if an incoming packet is a delayed original or a new copy. QUIC resolves this ambiguity through the use of monotonically growing packet numbers. If a packet is lost, a new packet will be generated with a unique, incremented packet number, potentially containing retransmitted payload. An additional benefit of this approach is the enhanced visibility of packet loss, which in turn enables more fine-grained tuning of QUIC's congestion control algorithms.
+
+\subsection{QUIC's Performance Drawback}
+Despite its many benefits, QUIC faces existing drawbacks that hinder its performance, especially within the context of high-bandwidth networks. As demonstrated by Jaeger et al.~\cite{10186365}, \ac{TCP} and \ac{TLS} achieved a throughput of 8010 Mbit/s on a 10 Gbit/s link, whereas the top-performing QUIC implementation measured only 3004 Mbit/s. As previously discussed in Chapter~\ref{chap:introduction}, this performance disparity is largely attributable to inefficient packet I/O, which can be optimized. However, other significant challenges exist.
+
+Consider a scenario where a server, acting like a streaming service, sends static data stored in non-volatile memory to a client. A TCP-based solution leveraging \ac{kTLS} and the \texttt{sendfile(2)} system call (as illustrated in Figure~\ref{fig:memory-bandwidth-TCP}) can efficiently transfer data with only a single copy into kernel memory from storage. In contrast, because QUIC operates as a userspace application, this process involves an additional memory copy: first from storage into kernel memory, and then from kernel memory into the application's userspace memory. As depicted in Figure~\ref{fig:memory-bandwidth-QUIC}, this incurs not only increased CPU cycles for the copying but also consumes significant memory bandwidth. While introducing a new API could potentially eliminate this extra copy, such a change would carry serious security implications by blurring the critical distinction between kernel and userspace capabilities.
+
+This all goes to say that QUIC itself is not a silver bullet, and there exist many areas for improvement.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.85\linewidth]{pics/memory_bandwidth_TCP_kTLS_sendfile.pdf}
+	\caption{Maximum Memory Bandwidth with TCP}
+	\label{fig:memory-bandwidth-TCP}
+\end{figure}
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.85\linewidth]{pics/memory_bandwidth_QUIC.pdf}
+	\caption{Maximum Memory Bandwidth with QUIC}
+	\label{fig:memory-bandwidth-QUIC}
+\end{figure}
 
 \section{eBPF}
 \label{sec:bpf}
@@ -188,7 +260,7 @@ Immediately after allocating the UMEM region, the userspace process contains own
 \begin{figure}
 	\centering
     \includegraphics[width=.90\linewidth]{pics/umem-1}
-	\caption{UMEM After Initialization}
+	\caption{UMEM After Initialization. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:umem-after-initialization}
 \end{figure}
 
@@ -199,14 +271,14 @@ The userspace application then yields ownership of a specified number of UMEM ch
 \begin{figure}
 	\centering
     \includegraphics[width=.90\linewidth]{pics/umem-2}
-	\caption{UMEM Chunks Owned by Fill Queue}
+	\caption{UMEM Chunks Owned by Fill Queue. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:umem-owned-by-fill-queue}
 \end{figure}
 
 \begin{figure}
 	\centering
     \includegraphics[width=.90\linewidth]{pics/umem-3}
-	\caption{UMEM Chunks Owned by Kernel}
+	\caption{UMEM Chunks Owned by Kernel. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:umem-owned-by-kernel}
 \end{figure}
 
@@ -215,7 +287,7 @@ Once the packets have been copied into the UMEM chunks controlled by the kernel,
 \begin{figure}
 	\centering
     \includegraphics[width=.90\linewidth]{pics/umem-4}
-	\caption{Kernel Adds Descriptors to RX Queue}
+	\caption{Kernel Adds Descriptors to RX Queue. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:add-descs-to-fill-queue}
 \end{figure}
 
@@ -224,7 +296,7 @@ Once the kernel has consumed a descriptor from the RX queue, the userspace appli
 \begin{figure}
 	\centering
     \includegraphics[width=.90\linewidth]{pics/umem-5}
-	\caption{Process Adds Descriptor to TX Queue}
+	\caption{Process Adds Descriptor to TX Queue. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:add-desc-to-tx-queue}
 \end{figure}
 
