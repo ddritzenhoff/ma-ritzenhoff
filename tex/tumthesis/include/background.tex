@@ -259,7 +259,7 @@ Immediately after allocating the UMEM region, the userspace process contains own
 
 \begin{figure}
 	\centering
-    \includegraphics[width=.90\linewidth]{pics/umem-1}
+    \includegraphics[width=.85\linewidth]{pics/umem-1}
 	\caption{UMEM After Initialization. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:umem-after-initialization}
 \end{figure}
@@ -270,14 +270,14 @@ The userspace application then yields ownership of a specified number of UMEM ch
 
 \begin{figure}
 	\centering
-    \includegraphics[width=.90\linewidth]{pics/umem-2}
+    \includegraphics[width=.85\linewidth]{pics/umem-2}
 	\caption{UMEM Chunks Owned by Fill Queue. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:umem-owned-by-fill-queue}
 \end{figure}
 
 \begin{figure}
 	\centering
-    \includegraphics[width=.90\linewidth]{pics/umem-3}
+    \includegraphics[width=.85\linewidth]{pics/umem-3}
 	\caption{UMEM Chunks Owned by Kernel. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:umem-owned-by-kernel}
 \end{figure}
@@ -286,7 +286,7 @@ Once the packets have been copied into the UMEM chunks controlled by the kernel,
 
 \begin{figure}
 	\centering
-    \includegraphics[width=.90\linewidth]{pics/umem-4}
+    \includegraphics[width=.85\linewidth]{pics/umem-4}
 	\caption{Kernel Adds Descriptors to RX Queue. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:add-descs-to-fill-queue}
 \end{figure}
@@ -295,7 +295,7 @@ Once the kernel has consumed a descriptor from the RX queue, the userspace appli
 
 \begin{figure}
 	\centering
-    \includegraphics[width=.90\linewidth]{pics/umem-5}
+    \includegraphics[width=.85\linewidth]{pics/umem-5}
 	\caption{Process Adds Descriptor to TX Queue. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:add-desc-to-tx-queue}
 \end{figure}
@@ -315,6 +315,155 @@ However, this costly double-copy can be entirely bypassed by enabling zero-copy 
 \subsubsection{XDP Hardware Offload}
 \label{subsec:xdp-hardware-offload}
 In the effort to minimize load on the CPU, it has now also become possible to offload an XDP program to the \ac{NIC}. Pioneered by Netronome, their SmartNIC is able to directly ingest the \ac{eBPF} bytecode of an \ac{XDP} program, compile it to the native instruction set, and execute the logic before the packet reaches the host CPU's memory as shown in Kicinski et. al~\cite{Kicinski2017XDP}. The implication of such a change is a reduction in latency and an increase in throughput. This is largely due to eliminating the need for costly \ac{DMA} transfers into kernel memory and avoiding the traditional hardware interrupt path.
+
+\section{Precision Time Protocol}
+\label{sec:ptp}
+Throughout history, humans have continuously refined methods of timekeeping to enable synchronization among multiple entities. From sundials to pendulum clocks, the need for precise time has spurred ever-finer-grained models. \ac{PTP}, defined by the \ac{IEEE} as \ac{IEEE}-1588, is a protocol to synchronize clocks in a computer network~\cite{IEEE1588_2019_PTP} and represents the next step in this evolution. Several versions exist, each of which supersedes the previous version: PTPv1 (\ac{IEEE} 1588-2002), PTPv2 (\ac{IEEE} 1588-2008), and PTPv2.1 (\ac{IEEE} 1588-2019). \ac{PTP} is accurate to the sub-microsecond, can function over Ethernet or IP, and is already widely deployed in industry ~\cite{MetaPTP2022}.
+
+Setting up a \ac{PTP} network involves a clear sequence of steps. Initially, each node within the network must be configured. Thereafter, the Best Master Clock Algorithm, as detailed in Subsection~\ref{subsec:best-master-clock-algorithm}, is executed to determine the optimal master clock. The final step is for all nodes to synchronize their clocks, a process elaborated upon in Subsection~\ref{subsec:synchronization}. It is imperative for a successful synchronization that the nodes align their clock \emph{frequencies}, \emph{phases}, and \emph{times}.
+
+\subsection{PTP Profiles}
+\label{subsec:ptp-profiles}
+The PTPv2.1 (\ac{IEEE} 1588-2019) standard includes various \emph{profiles} that adapt the core \ac{PTP} protocol to meet the specific requirements of different industries. The \ac{PTP} topology developed for this thesis utilizes the \ac{IEEE} 802.1AS profile~\cite{4659212}, commonly known as \emph{\ac{gPTP}}. This profile is primarily used in Ethernet local area networks for applications such as audio and video, and falls under the \ac{TSN} umbrella. A key advantage of \ac{gPTP} is its operation directly at Ethernet Layer 2, which reduces overhead compared to other profiles that function at Layer 3.
+
+\subsection{PTP Tools}
+\label{subsec:ptp-tools}
+Within Linux, three primary tools are used to carry out the clock synchronization in \ac{PTP}: \texttt{ptp4l}, \texttt{phc2sys}, and \texttt{pmc}. These tools are all part of the \emph{linuxptp} project, which is an open-source implementation of the \ac{PTP} specification~\cite{LinuxPTP}. \texttt{ptp4l} is a daemon that synchronizes the \ac{PHC} of the \ac{NIC} to match the time of a \ac{PTP} master clock. It accomplishes this by exchanging \ac{PTP} messages (i.e. Sync, Follow\_Up, Delay\_Req, Delay\_Resp) with the master clock as further described in Subsection~\ref{subsec:synchronization}. These messages allow \texttt{ptp4l} to calculate the offset, delay, and drift between the slave and master \ac{PHC}s, all of which are necessary to maintain high accuracy. \texttt{phc2sys} is a daemon that disciplines the \texttt{CLOCK\_REALTIME} (i.e. the system clock) or \ac{PHC}s with a chosen \ac{PHC}. This is desirable for a few reasons. First, \texttt{phc2sys} allows the system times of two different computers to be synced with each other, which is crucial for scenarios demanding high temporal accuracy like data logging or event correlation. Second, using \texttt{phc2sys} to sync multiple \ac{PHC}s is advantageous when network topology constraints prevent them from being connected through traditional \ac{PTP} means. An example of such a topology can be seen in Figure~\ref{fig:ptp-topology}. Finally, \texttt{pmc} is a tool used to configure \texttt{ptp4l} during run-time.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.95\linewidth]{pics/ptp-topology2}
+	\caption{A PTP Topology showing \texttt{phc2sys} usage. \texttt{eno6} on the sniffer disciplines the system time and the \ac{PHC}s corresponding to \texttt{eno8} and \texttt{eno7}. \texttt{eno6} on the client also disciplines the system time using \texttt{phc2sys}. Synchronizing \texttt{eno7}'s \ac{PHC} on the sniffer with \texttt{eno6}'s \ac{PHC} necessitates an additional port and interface on \texttt{eno7}'s \ac{NIC}. This auxiliary port would establish a \ac{PTP} link to an extra port on \texttt{eno6}'s \ac{NIC}, which would allow \texttt{eno7} to continue capturing traffic while the auxiliary interface disciplines the shared \ac{PHC} via its slave-master relationship with \texttt{eno6}. The same principle applies to \texttt{eno8}.}
+	\label{fig:ptp-topology}
+\end{figure}
+
+\subsection{Time Types}
+\label{subsec:time-types}
+As already alluded to, the concept of "time" itself can be defined and represented in various ways, each with distinct characteristics and applications. While numerous time representations exist, \ac{PTP} primarily interacts with a select few, each serving different purposes in achieving precise synchronization. This subsection details these relevant time types, from human-centric civil time to highly stable atomic timescales and the internal clocks found within computer systems.
+
+\subsubsection{Coordinated Universal Time (UTC)}
+\label{subsubsec:utc}
+\ac{UTC} is a timescale tied to the rotation of the Earth and is used for legal, civil, and daily life. Different time zones can be described as offsets from the \ac{UTC} time. So, for example, Berlin can be represented as \emph{UTC+2}, meaning that it is the current \ac{UTC} time plus two hours. Unfortunately, one downside to \ac{UTC} is that because it is tied to the Earth's rotation, which is not perfectly consistent, it is necessary to introduce some form of adjustment in order to keep it in sync with the solar day. This manifests itself in the form of leap seconds. Logically, leap seconds are problematic for high-precision systems because they introduce discontinuities and make time calculations more complex. Thus, another method is needed.
+
+\subsubsection{International Atomic Time (TAI)}
+\label{subsubsec:tai}
+\ac{TAI} is an atomic timescale that shares the reference point of January 1st, 1970 with \ac{UTC}; however, it differs in that it is bound to the atomic scale (e.g. measuring the vibrations of atoms like cesium-133) as opposed to Earth's rotation. This is beneficial as the behavior of certain atoms are much more precise, which results in an extremely robust monotonically increasing clock. Converting \ac{TAI} to \ac{UTC} requires knowing how many leap seconds have occurred since the reference point in 1970. As of July 2025, there have been 37 leap seconds, which means $UTC = TAI - 37$. The benefit is that data centers using synchronized hardware working in \ac{TAI} are still able to store timestamps in \ac{UTC} for clients to consume.
+
+\subsubsection{CLOCK\_REALTIME}
+\label{subsubsec:clock-realtime}
+Most computers have an internal oscillator on the motherboard they use to keep their best approximation of \ac{UTC} time. The \texttt{CLOCK\_REALTIME} is a Linux-native label used to interact with this time. When \texttt{phc2sys} is used to alter the system time, it references \texttt{CLOCK\_REALTIME}. This clock is therefore susceptible to \ac{PTP}.
+
+\subsubsection{CLOCK\_MONOTONIC}
+\label{subsubsec:clock-monotonic}
+Beyond approximating \ac{UTC}, the internal oscillator also maintains a predictable clock, accessible as \texttt{CLOCK\_MONOTONIC}. This clock is useful for measuring intervals, with typical use cases including benchmarks, timeouts, and scheduling. It is monotonically increasing, usually commencing at system boot, and is unaffected by \ac{PTP} adjustments.
+
+\subsection{NIC Hardware Clocks}
+\label{subsec:nic-hw-clocks}
+Besides the oscillator found on the computer's motherboard, some \ac{NIC}s are equipped with their own internal oscillators for timekeeping, as illustrated in Figure~\ref{fig:ptp-timestamping-options}. These \ac{PHC}s are crucial for achieving extremely accurate timestamping because they are inherently immune to the scheduling delays that can arise with software timestamps in Linux.
+
+To verify whether a \ac{NIC} supports hardware timestamping, the \texttt{ethtool -T <interface\_name>} command can be used. A strong indication of hardware timestamping capability, and therefore suitability for \ac{PTP}, is the presence of \emph{hardware-receive}, \emph{hardware-transmit}, and \texttt{PTP Hardware Clock: <num>} in the command's output.
+
+As a word of caution, it is important to note that some \ac{NIC}s may only offer hardware timestamps up to a certain bit rate or packet rate. Therefore, referencing the \ac{NIC} documentation is essential to determine these specific limitations.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.85\linewidth]{pics/ptp-timestamping2}
+	\caption{PTP Timestamping Options. Adapted from \cite{rosel2021ptp}.}
+	\label{fig:ptp-timestamping-options}
+\end{figure}
+
+\subsection{Clock Types}
+\label{subsec:clock-types}
+To maintain its high resolution, \ac{PTP} employs a hierarchy of clocks, each of which fulfills a distinct function. Crucially, no non-\ac{PTP}-aware devices should exist between \ac{PTP} nodes, as they can disrupt the extremely delicate synchronization efforts. Furthermore, a tree-topology is always maintained. Redundant ports are automatically switched from 'slave' (S) or 'master' (M) states into a 'passive' (P) state to prevent loops. An example topology is illustrated in Figure~\ref{fig:ptp-network-with-pruning}.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.75\linewidth]{pics/ptp-topology3}
+	\caption{Example \ac{PTP} Network with Pruning.}
+	\label{fig:ptp-network-with-pruning}
+\end{figure}
+
+\subsubsection{Ordinary Clock}
+\label{subsubsec:ordinary-clock}
+The \ac{OC} is a device type in the \ac{PTP} network that has a single \ac{PTP} port and functions either as a source (master) or a destination (slave) with respect to clock synchronization. These devices typically do not participate in the active distribution of time to other network segments. There can be multiple master and slave \ac{PHC}s in the network.
+
+\subsubsection{Grandmaster Clock}
+\label{subsubsec:grandmaster-clock}
+The \ac{GMC} serves as the primary and typically most accurate time source for the entire \ac{PTP} network. Characterized by its superior clock quality, it often contains direct access to highly precise external references such as a \ac{GPS} receiver or an atomic clock. A \ac{PTP} network can only have one \ac{GMC} at any given time, and every \ac{GMC} inherently assumes the role of a master clock.
+
+\subsubsection{Boundary Clock}
+\label{subsubsec:boundary-clock}
+The \ac{BC} is a device that acts as both a slave to an upstream master clock, synchronizing its own time, and then as a master to downstream slave clocks, distributing that synchronized time to other network segments. It is typically a multi-port, \ac{PTP}-aware network device, and is often implemented within layer 2 switches. Fundamentally, it exists to scale \ac{PTP} deployments to more complex topologies and reduce the synchronization load on the master.
+
+\subsubsection{Transparent Clock}
+\label{subsubsec:transparent-clock}
+The \ac{TC} is a network device, typically an Ethernet switch as seen in Figure~\ref{fig:ptp-topology}, whose main purpose is to measure and compensate the time a \ac{PTP} message spends within the device itself. This 'residence time' is calculated by timestamping the moment of the packet's arrival $t_1$. When the \ac{PTP} message leaves the \ac{TC}, the egress timestamp $t_2$ is taken, and the difference between $t_2-t_1$ is taken and added to the \texttt{CorrectionField} within the particular \texttt{Sync} message. The slave may then use this field when calculating its clock's offset and delay. This synchronization process is further described in Subsection~\ref{subsec:synchronization}.
+
+A key advantage of Transparent Clocks is their ability to achieve a flatter \ac{PTP} topology, contrasting with Boundary Clocks which inherently increase the depth of the tree topology. Also, Transparent Clocks are technically not part of the \ac{PTP} master and slave state machine the way the other clock types are; however, when used in a \ac{P2P} setup as seen in Figure~\ref{fig:ptp-tc-sync}, the \ac{TC} will additionally calculate the propagation delays of the master and slave links. It will then add the master link delay to the \texttt{CorrectionField} as well.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.85\linewidth]{pics/ptp-tc-sync}
+	\caption{Transparent Clock behavior in a P2P \ac{PTP} Setup. RT is the residence time, which represents the amount of time the message spent within the \ac{TC}. This value is added to \texttt{CorrectionField} as described in Subsubsection~\ref{subsubsec:transparent-clock}. Adapted from \cite{NetworkLessonsPTP}.}
+	\label{fig:ptp-tc-sync}
+\end{figure}
+
+\subsection{Best Master Clock Algorithm}
+\label{subsec:best-master-clock-algorithm}
+The \ac{BMCA} runs on each node within the \ac{PTP} network to establish and maintain a hierarchy of \ac{PHC}s. To initiate this process, master-node candidates transmit "Announce" messages to their neighbors. By default, these messages are sent every two seconds, although this frequency is configurable from 128 times per second down to once every 128 seconds. These messages allow the topology to remain dynamic and adapt when changes in the network occur.
+
+Each Announce message carries the properties of the transmitting node's \ac{PHC} as its payload, and as detailed in Table~\ref{tab:bmca-attributes}, each Announce message includes the following attributes: \texttt{priority1}, \texttt{clockClass}, \texttt{clockAccuracy}, \texttt{offsetScaledLogVariance}, \texttt{priority2}, and \texttt{clockIdentity}. When it receives an Announce message, the node checks the advertised \texttt{priority1} against its own, using each subsequent attribute as a potential tie-breaker. If the node determines itself as master, it will continue transmitting Announce messages. Otherwise, it changes into a slave and stops transmitting them.
+
+\begin{table}[htbp]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{l p{8cm}}
+        \toprule
+        \textbf{PTP Attribute} & \textbf{Description} \\
+        \midrule
+        \texttt{priority1} & A value (0-255) to set initial preference. A lower value indicates higher priority. \\
+        \texttt{clockClass} & A value (0-255) indicating the clock's quality. Lower values signify higher resolution. \\
+        \texttt{clockAccuracy} & An encoded value representing the clock accuracy to the "true" time. Lower values indicate higher accuracy. \\
+        \texttt{offsetScaledLogVariance} & An encoded value representing the clock's variance. Lower values indicate greater stability. \\
+        \texttt{priority2} & A secondary priority value (0-255), used as a tie-breaker if the listed attributes above are equal. Lower values indicate higher preference. \\
+        \texttt{clockIdentity} & The clock's unique 64-bit identifier, usually based on its MAC address. Used as the final tie-breaker in the \ac{BMCA}. \\
+        \bottomrule
+    \end{tabular}
+    \caption{Key Attributes for \ac{PTP} \ac{BMCA}}
+    \label{tab:bmca-attributes}
+\end{table}
+
+\subsection{Synchronization}
+\label{subsec:synchronization}
+Once the \ac{PTP} topology is established, the \ac{PHC}s begin their synchronization process. At a high level, a master \ac{PHC} aims to achieve three key objectives when disciplining its slaves: frequency, phase, and time synchronization. Synchronizing the frequency ensures both clocks tick at the same rate. Synchronizing the phase means the clocks tick at precisely the same instant. Finally, synchronizing the times ensures both clocks agree on the absolute time of day.
+
+Figure~\ref{fig:ptp-frequency-synchronization} depicts the message sequence for a slave to achieve frequency synchronization with its master. The master initiates this by dispatching two \texttt{Sync} messages and recording their egress timestamps, $t_{m}^{1} \text{ and } t_{m}^{2}$, at the moment they exit the \ac{NIC}. These timestamps are subsequently transmitted to the slave in individual \texttt{Follow\_Up} messages. In parallel, the slave generates ingress timestamps, $t_{s}^{1} \text{ and } t_{s}^{2}$, upon the \texttt{Sync} messages' arrival at its \ac{NIC}'s port. Now equipped with these four timestamp values, the slave possesses enough information to compute its clock drift relative to the master.
+
+The calculation proceeds by first determining the time intervals on both the master and slave sides: $\Delta_{m}=t_{m}^{2}-t_{m}^{1}$ and $\Delta_{s}=t_{s}^{2}-t_{s}^{1}$. Thereafter, the slave's relative frequency drift is computed as $\text{Drift}=\frac{\Delta_{2}-\Delta_{1}}{\Delta{2}}$. If this drift value is positive, it signifies the slave's clock is advancing faster than the master's, thus requiring a reduction in speed. Conversely, a negative drift value indicates the slave's clock is lagging, necessitating an increase in speed.
+
+With the frequency synchronized, the slave clock proceeds to synchronize its phase and time-of-day. This is achieved by precisely calculating the propagation delay and the clock offset. The propagation delay represents the time a packet takes to traverse the physical medium from master to slave. The offset is the necessary adjustment to the slave's clock to align it with the master's, after accounting for this propagation delay.
+
+Figure~\ref{fig:ptp-synchronization} illustrates the message exchange for calculating these two values. The master initiates the process by sending a \texttt{Sync} message, capturing its departure timestamp, $t_1$, as it leaves the \ac{NIC}. The master then sends a \texttt{Follow\_Up} message containing the $t_1$ timestamp in its payload. Upon arrival at the slave, the \texttt{Sync} message is timestamped to produce $t_2$. The slave subsequently sends a \texttt{Delay\_Req} message to the master, recording its departure timestamp, $t_3$, from the \ac{NIC}. When the \texttt{Delay\_Req} arrives at the master, a final timestamp, $t_4$ is generated and promptly included in a \texttt{Delay\_Resp} message sent back to the slave.
+
+Equipped with $t_1, t_2, t_3, \text{ and } t_4$, the slave can now calculate the offset and delay. We define two intermediate values as seen in Figure~\ref{fig:ptp-synchronization}: $A=t_2-t_1=\text{delay}+\text{offset}$ and $B=t_4-t_3=\text{delay}-\text{offset}$. From these, the propagation delay and offset can be derived as follows: $\text{delay}=\frac{A+B}{2}$ and $\text{offset}=\frac{A-B}{2}$. As an example, using the values from Figure~\ref{fig:ptp-synchronization}, if $A=t_2-t_1=58-53=5$ and  $B=t_4-t_3=64-63=1$, then the calculated offset is ${offset}=\frac{A-B}{2}=\frac{5-1}{2}=2$ and the delay is ${delay}=\frac{A+B}{2}=\frac{5+1}{2}=3$. The slave then adjusts its local time by this calculated offset to maintain synchronization with the master.
+
+The synchronization process just described is known as the "two-step setup," due to the separate \texttt{Sync} and \texttt{Follow\_Up} messages. An alternative, "one-step setup," integrates the $t_1$ timestamp directly into the \texttt{Sync} message payload, thereby eliminating the need for a separate \texttt{Follow\_Up} message. By default, \texttt{Sync} and \texttt{Delay\_Req} messages are sent once per second, but their frequency can be adjusted from 128 times per second to once every 128 seconds.
+
+Finally, it's important to note that Figure~\ref{fig:ptp-synchronization} depicts the Peer-to-Peer model for delay and offset calculation within \ac{PTP}. An alternative, the End-to-End model, also exists but is excluded here for brevity and because this thesis's PTP topology utilizes the Peer-to-Peer model.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.90\linewidth]{pics/ptp-rate-sync2}
+	\caption{\ac{PTP} message exchange for clock frequency difference calculation using the Peer-to-Peer Method. Adapted from \cite{MobatimePTP}.}
+	\label{fig:ptp-frequency-synchronization}
+\end{figure}
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.90\linewidth]{pics/ptp-rate-sync}
+	\caption{\ac{PTP} message exchange for delay and offset calculations using the Peer-to-Peer Method. Adapted from \cite{MobatimePTP}.}
+	\label{fig:ptp-synchronization}
+\end{figure}
 
 \section{MsQuic}
 \label{sec:msquic}
