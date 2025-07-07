@@ -11,7 +11,7 @@ Google, the original developer of QUIC, was already serving 50\% of all requests
 \begin{figure}
 	\centering
     \includegraphics[width=.50\linewidth]{pics/quic-stack}
-	\caption{HTTP/2 and HTTP/3 Network Stacks}
+	\caption{HTTP/2 and HTTP/3 Network Stacks. \textbf{TODO: figure out how to cite tikz}}
 	\label{fig:network-stacks}
 \end{figure}
 
@@ -467,9 +467,82 @@ Finally, it's important to note that Figure~\ref{fig:ptp-synchronization} depict
 
 \section{MsQuic}
 \label{sec:msquic}
+MsQuic\footnote{https://github.com/microsoft/msquic}, Microsoft's QUIC implementation, was selected for the measurements in this thesis due to its high-throughput performance, as demonstrated in \textbf{[TODO: CITE HIGH-THROUGHPUT REFERENCE]}~\cite{}. Furthermore, it is one of the few QUIC implementations that supports \ac{XDP}. Developed for Windows, Linux, FreeBSD, and macOS, MsQuic employs a two-layered architecture to achieve cross-platform scalability: the QUIC layer and the \ac{PAL}.
+
+The QUIC layer encapsulates the core QUIC protocol logic and generally remains consistent across different builds. In contrast, the \ac{PAL} provides abstractions for critical components such as \ac{TLS}, \ac{UDP}, and operating system primitives like threads and locks~\cite{MsQuicArchitecture}. While this architecture introduces some complexity, it offers the significant advantage of modularity, enabling "plug-and-play" functionality for various components. For instance, users can choose from three \ac{TLS} variants: OpenSSL1.1\footnote{https://openssl-library.org/news/openssl-1.1.1-notes/index.html}, OpenSSL3\footnote{https://openssl-library.org/news/openssl-3.0-notes/index.html}, and Schannel\footnote{https://learn.microsoft.com/en-us/windows/win32/com/schannel}.
+
+This modular design also allows for fine-grained control over the datapath, which is where \ac{XDP} integration becomes relevant. To establish a baseline for comparison with \ac{XDP}, the subsequent subsections will detail the existing datapath enhancements already incorporated into MsQuic.
+
+\subsection{Receiving Data}
+\label{subsec:receiving-data}
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.65\linewidth]{pics/buffers.pdf}
+	\caption{Components of the default packet datapath. Adapted from \cite{}. \textbf{TODO: figure out how to cite tikz.}}
+	\label{fig:buffers}
+\end{figure}
+
+Figure~\ref{fig:recvfrom} shows how a packet flows through the kernel to reach a socket buffer, after which a system call such as \texttt{recvfrom(2)} can pull the packet's data into userspace. Upon arrival at the \ac{NIC}, the packet is directly \ac{DMA}-ed into the RX ring buffer, as depicted in Figure~\ref{fig:buffers}. This direct memory access bypasses the \ac{CPU}, significantly reducing its load. The \ac{NIC} then signals the \ac{CPU} via an interrupt request, indicating packet arrival. In response, a NAPI\footnote{https://docs.kernel.org/networking/napi.html} context is established, which subsequently polls the \ac{NIC} for further packets.
+
+With packets now present in the RX buffer, the \ac{NIC} driver is invoked. It creates an \texttt{sk\_buff} structure, which holds references to the packet data in the RX buffer along with essential metadata. This \texttt{sk\_buff} then traverses the various layers of the network stack, undergoing necessary processing steps, until it is ultimately enqueued into the socket's receive buffer. Finally, the \texttt{recvfrom(2)} system call is invoked, triggering a context switch that copies the packet data from the kernel buffer into the userspace application's memory.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.95\linewidth]{pics/recvfrom(2)v2.pdf}
+	\caption{Receiving with \texttt{recvfrom(2)}.}
+	\label{fig:recvfrom}
+\end{figure}
+
+\subsubsection{recvfrom(2)}
+\label{subsubsec:recvfrom}
+As seen in Figure~\ref{fig:recvmmsg}, the \texttt{recvmmsg(2)} system call represents an improvement over \texttt{recvfrom(2)} by allowing an application to receive multiple messages with a single system call. It accomplishes this by providing the kernel with an array of buffers and instructs it to fill as many as possible with available packet data. Fundamentally, this enables the application to \emph{batch} several receive operations into a single system call, which amortizes the cost of the context switch.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.95\linewidth]{pics/recvmmsg(2)v2.pdf}
+	\caption{Receiving with \texttt{recvmmsg(2)}.}
+	\label{fig:recvmmsg}
+\end{figure}
+
+\subsubsection{Generic Receive Offload}
+\label{subsubsec:gro}
+One downside to the approaches above is that an \texttt{sk\_buff} is allocated for every MTU-sized packet that arrives on the \ac{NIC}. Each \texttt{sk\_buff} then individually goes through each of the network stack processing steps, even if the packets are part of the same flow. To improve on this design, \ac{GRO} can be used, which assembles packets as part of the same flow under the umbrella of a single \texttt{sk\_buff}. Given that the currently maximum allowed \ac{GRO} packet size is 64k bytes\footnote{https://elixir.bootlin.com/linux/v6.15.4/source/include/linux/netdevice.h\#L2319} and a common MTU size is 1.5k bytes, this can lead to a reduction in processing by a factor of $\frac{64}{1.5}=~43$. As discussed Chapter~\ref{chap:evaluation}, this improves performance significantly. A representation of this \texttt{sk\_buff} can be seen in Figure~\ref{fig:gro}.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.95\linewidth]{pics/grov2.pdf}
+	\caption{Receiving with \ac{GRO}.}
+	\label{fig:gro}
+\end{figure}
+
+Finally, we can combine these two enhancements together as seen in Figure~\ref{gro-recvmmsg}. This results in the combination of less overhead per context switch and less processing per byte of data.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.95\linewidth]{pics/recvmmsg(2)+grov2.pdf}
+	\caption{Receiving with \ac{GRO} and \texttt{recvmmsg(2)}.}
+	\label{fig:gro-recvmmsg}
+\end{figure}
+
+\subsection{Logging}
+\label{subsec:logging}
+MsQuic generates logs and traces using CLOG~\cite{MsQuicDiagnostics}, a cross-platform diagnostic tool developed by Microsoft. On Linux, CLOG seamlessly integrates with LTTng\footnote{https://lttng.org/}, allowing for the production of logs with minimal overhead. Beyond its efficiency, CLOG's messages are highly structured, making them easy to parse for subsequent post-processing. This robust logging capability, as further detailed in Chapter~\ref{chap:evaluation}, plays an extensive role in the \ac{PTP} measurements.
 
 \section{POS Measurement Framework}
-\label{sec:pos-measurement-framework}
+\label{sec:pos-measurement-framework} 
+Measurements for this thesis utilized a modified \ac{QIR} framework, as described by Jaeger et al.~\cite{10186365}. This setup exclusively uses bare metal machines, eliminating potential noise introduced by virtualization software. The network topology for these measurements is detailed in Figure~\ref{fig:qir-topology}.
+
+For each measurement, a file-download scenario between a client and server was executed, allowing for throughput inference. A dedicated management node was responsible for resetting machines to a baseline state (e.g., Debian Bookworm) and distributing necessary files and environment variables. Splitters were incorporated as non-invasive means to duplicate packets exchanged between the client and server, enabling the sniffer to capture them, which was crucial for \ac{PTP} tests.
+
+The core advantage of the \ac{QIR} framework lies in its emphasis on repeatability. It allows for the declarative specification of runtime environments, QUIC implementations, test types, and pre- and post-processing steps, all handled automatically by \ac{QIR}.
+
+\begin{figure}
+	\centering
+    \includegraphics[width=.85\linewidth]{pics/qir-topology}
+	\caption{Measurement topology of the \ac{QIR} with dedicated hardware.}
+	\label{fig:qir-topology}
+\end{figure}
 
 % There department-specific \href{https://www.in.tum.de/en/current-students/administrative-matters/thesis-guidelines-and-topics/}{\textcolor{TUMBlue}{guidelines}} that describe the formatting rules and general guidelines for handing in your theses at the \school.
 

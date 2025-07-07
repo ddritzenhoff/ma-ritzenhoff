@@ -20,6 +20,7 @@
 	\acro{XSK}{XDP Socket\acroextra{, a Linux kernel socket and part of the AF\_XDP address family, which allows user-space applications to directly access raw network packets.}}
 	\acro{DMA}{Direct Memory Access\acroextra{, a feature that allows hardware components to directly access system memory for reading and writing data without requiring the CPU's intervention.}}
 	\acro{TCP}{Transmission Control Protocol\acroextra{, an internet protocol that provides reliable, ordered, and error-checked delivery of data streams between applications over an IP network.}}
+	\acro{UDP}{User Datagram Protocol\acroextra{, a lightweight, connectionless protocol that QUIC uses as its layer 4 transport.}}
 	\acro{HTTP/2}{Hypertext Transfer Protocol 2\acroextra{, the second version of the Hypertext Transfer Protocol, which enables features such as full request and response multiplexing over a single TCP connection, and compressed header fields.}}
 	\acro{TLS}{Transport Layer Security\acroextra{, a cryptographic protocol that provides end-to-end security for data transmitted over a network, ensuring privacy, integrity, and authenticity between communicating applications. It is most notably used to secure web traffic via HTTPS.}}
 	\acro{0-RTT}{0 Round Trip Time\acroextra{, a feature in TLS 1.3 and QUIC that allows a client to send application data in its very first message to a server when resuming a connection, thus eliminating an entire round trip of latency from the connection establishment process.}}
@@ -41,4 +42,8 @@
 	\acro{P2P}{Peer to Peer}
 	\acro{TSN}{Time Sensitive Networking\acroextra{, a set of standards that provide deterministic messaging and guaranteed delivery for time-sensitive data over Ethernet networks.}}
 	\acro{gPTP}{Generalized Precision Time Protocol\acroextra{, an adaptation of the Precision Time Protocol specifically designed to provide highly accurate time synchronization for time-sensitive applications within Ethernet networks.}}
+	\acro{GRO}{Generic Receive Offload\acroextra{, a software technique that aggregates multiple incoming small packets belonging to the same flow into a single, larger packet within the NIC driver, which reduces the number of packets the CPU has to process and improves receive throughput.}}
+	\acro{PAL}{Platform Abstraction Layer\acroextra{, a software layer in MsQuic, separated from the core QUIC logic, which holds the abstractions for TLS, UDP, and the OS.}}
+	\acro{OS}{Operating System}
+	\acro{CPU}{Central Processing Unit\acroextra{, the "brain" of the computer, where most programs are run.}}
 \end{acronym}
