@@ -11,7 +11,7 @@ Google, the original developer of QUIC, was already serving 50\% of all requests
 \begin{figure}
 	\centering
     \includegraphics[width=.50\linewidth]{pics/quic-stack}
-	\caption{HTTP/2 and HTTP/3 Network Stacks. \textbf{TODO: figure out how to cite tikz}}
+	\caption{HTTP/2 and HTTP/3 Network Stacks.}
 	\label{fig:network-stacks}
 \end{figure}
 
@@ -26,7 +26,7 @@ QUIC was specifically designed to overcome several of \ac{TCP}'s inherent shortc
 	\label{fig:hol-blocking}
 \end{figure}
 
-\subsection{QUICer Feedback Loops}
+\subsection{Iteration Velocity}
 \label{subsec:slow-adoption-of-new-features}
 Integrating \ac{TCP}'s codebase directly within the operating system kernel, while beneficial for avoiding costly packet copying to userspace, introduces substantial drawbacks. This approach leads to a comparatively slow adoption rate for new features or bug fixes, and significantly raises the stakes for every code change. For any new \ac{TCP} enhancement to achieve widespread use, it requires all clients to upgrade their kernel versions to the one where the feature was introduced. This tight coupling creates brittleness for applications dependent on particular \ac{TCP} features, as they may not function correctly if paired with an outdated kernel. This contrasts sharply with protocols like QUIC, which operates in userspace and is integrated directly into the application itself. Consequently, updating QUIC is as simple as bundling the newest version of the QUIC library with the application code, thereby eliminating this brittleness entirely. Furthermore, userspace offers a more forgiving environment for experimentation. If a new algorithm or feature contains a bug, it is far less likely to crash the entire operating system than with \ac{TCP}, making development and testing safer and quicker.
 
@@ -55,7 +55,7 @@ Unlike \ac{TCP}, which binds connections to the source and destination IP addres
 \label{subsec:packet-ambiguity}
 When a packet goes missing in \ac{TCP}, a retransmission from the server to the client carries the same sequence number and data as the original. This introduces ambiguity, making it difficult to discern if an incoming packet is a delayed original or a new copy. QUIC resolves this ambiguity through the use of monotonically growing packet numbers. If a packet is lost, a new packet will be generated with a unique, incremented packet number, potentially containing retransmitted payload. An additional benefit of this approach is the enhanced visibility of packet loss, which in turn enables more fine-grained tuning of QUIC's congestion control algorithms.
 
-\subsection{QUIC's Performance Drawback}
+\subsection{QUIC's Limitations}
 Despite its many benefits, QUIC faces existing drawbacks that hinder its performance, especially within the context of high-bandwidth networks. As demonstrated by Jaeger et al.~\cite{10186365}, \ac{TCP} and \ac{TLS} achieved a throughput of 8010 Mbit/s on a 10 Gbit/s link, whereas the top-performing QUIC implementation measured only 3004 Mbit/s. As previously discussed in Chapter~\ref{chap:introduction}, this performance disparity is largely attributable to inefficient packet I/O, which can be optimized. However, other significant challenges exist.
 
 Consider a scenario where a server, acting like a streaming service, sends static data stored in non-volatile memory to a client. A TCP-based solution leveraging \ac{kTLS} and the \texttt{sendfile(2)} system call (as illustrated in Figure~\ref{fig:memory-bandwidth-TCP}) can efficiently transfer data with only a single copy into kernel memory from storage. In contrast, because QUIC operates as a userspace application, this process involves an additional memory copy: first from storage into kernel memory, and then from kernel memory into the application's userspace memory. As depicted in Figure~\ref{fig:memory-bandwidth-QUIC}, this incurs not only increased CPU cycles for the copying but also consumes significant memory bandwidth. While introducing a new API could potentially eliminate this extra copy, such a change would carry serious security implications by blurring the critical distinction between kernel and userspace capabilities.
@@ -176,7 +176,10 @@ One stipulation to loading an \ac{XDP} program is that it may only be attached t
 	\label{fig:xdp-receive-path}
 \end{figure}
 
-\subsection{xdp\_md}
+\subsection{Metadata}
+Depending on whether \texttt{XDP\_DRV} or \texttt{XDP\_SKB} is used, access to different sources of information is available, presenting a trade-off between early access to raw data and later access to richer, more context-aware information.
+
+\subsubsection{xdp\_md}
 \label{subsec:xdp-md}
 Upon entry of every single \texttt{XDP\_DRV} program, a struct \texttt{xdp\_md} is passed as an argument, providing essential information about the packet. Listing~\ref{lst:xdp-md} shows the struct's definition, which contains pointers to the beginning and end of the data as well as the index of the network interface on which the packet was received, the receive queue that handled the packet, and a metadata field where network drivers or \ac{XDP} programs can store custom information associated with the packet. As seen in Figure~\ref{fig:xdp-receive-path}, an \texttt{sk\_buff} has not yet been allocated, which is the reason for having less metadata available.
 
@@ -192,8 +195,7 @@ struct xdp_md {
 };
 \end{lstlisting}
 
-
-\subsection{sk\_buff}
+\subsubsection{sk\_buff}
 \label{subsec:sk-buff}
 The \texttt{sk\_buff} struct, which stands for socket buffer, and whose definition can be seen in Listing~\ref{lst:sk-buff}, is the central data structure representing a network packet as it traverses through the Linux network stack. The \texttt{XDP\_SKB} hook as seen in Figure~\ref{fig:xdp-receive-path} is invoked after such an \texttt{sk\_buff} has been created and thus replaces the \texttt{xdp\_md} struct for an \texttt{sk\_buff}. Created by the \ac{NIC} driver, the \texttt{sk\_buff} encapsulates the raw packet data and associated metadata such as pointers to the different protocol headers, the network interface on which the packet arrived, flags, and the length of the packet. It is used by every networking layer from the driver through to IP routing, firewalling, transport layers, and the user-space application's socket. It is designed to offer efficient in-kernel manipulation for operations like adding and stripping headers, and splitting and merging packets.
 
@@ -239,11 +241,11 @@ Once an \ac{eBPF} program has finished running within the XDP hook, it must retu
     \label{tab:xdp_actions}
 \end{table}
 
-\section{AF\_XDP}
+\subsection{AF\_XDP}
 \label{sec:af-xdp}
 Table~\ref{tab:xdp_actions} highlights the versatility of \texttt{XDP\_REDIRECT}. Beyond directing packets to other interfaces, it offers a powerful mechanism to send them directly to userspace. This capability is particularly beneficial for performance-sensitive protocols such as QUIC, because it completely bypasses the traditional kernel network stack, thereby eliminating its associated overhead. Achieving this direct delivery requires a userspace application to utilize an \texttt{AF\_XDP} socket.
 
-\subsection{Setting up an AF\_XDP Socket}
+\subsubsection{Setting up an AF\_XDP Socket}
 \label{subsec:af-xdp-socket}
 After an application establishes its \texttt{AF\_XDP} socket through the socket(2) system call, the next step is to set aside a special memory area for incoming packets. This area is called the UMEM region. When creating UMEM, two primary considerations come into play.
 
@@ -302,7 +304,7 @@ Once the kernel has consumed a descriptor from the RX queue, the userspace appli
 
 Throughout the lifetime of the process, this interplay of constantly consuming and producing descriptors on the ring buffers enables the transmission and reception of packets with minimal locking and low system call overhead due to the nature of batch sending and receiving the descriptors. Given that packet I/O is the greatest limiting factor to QUIC performance, AF\_XDP therefore offers an attractive value proposition with its cheap packet delivery.
 
-\subsection{XDP Options}
+\subsubsection{XDP Options}
 \label{subsec:xdp-options}
 Despite AF\_XDP being a relatively new technology, there are a number of available features to change and enhance the way it functions.
 
@@ -479,7 +481,7 @@ This modular design also allows for fine-grained control over the datapath, whic
 \begin{figure}
 	\centering
     \includegraphics[width=.65\linewidth]{pics/buffers.pdf}
-	\caption{Components of the default packet datapath. Adapted from \cite{}. \textbf{TODO: figure out how to cite tikz.}}
+	\caption{Components of the default packet datapath.}
 	\label{fig:buffers}
 \end{figure}
 
@@ -529,7 +531,7 @@ Finally, we can combine these two enhancements together as seen in Figure~\ref{g
 \label{subsec:logging}
 MsQuic generates logs and traces using CLOG~\cite{MsQuicDiagnostics}, a cross-platform diagnostic tool developed by Microsoft. On Linux, CLOG seamlessly integrates with LTTng\footnote{https://lttng.org/}, allowing for the production of logs with minimal overhead. Beyond its efficiency, CLOG's messages are highly structured, making them easy to parse for subsequent post-processing. This robust logging capability, as further detailed in Chapter~\ref{chap:evaluation}, plays an extensive role in the \ac{PTP} measurements.
 
-\section{POS Measurement Framework}
+\section{pos Measurement Framework}
 \label{sec:pos-measurement-framework} 
 Measurements for this thesis utilized a modified \ac{QIR} framework, as described by Jaeger et al.~\cite{10186365}. This setup exclusively uses bare metal machines, eliminating potential noise introduced by virtualization software. The network topology for these measurements is detailed in Figure~\ref{fig:qir-topology}.
 
