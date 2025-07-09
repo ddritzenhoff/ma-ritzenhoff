@@ -1,4 +1,200 @@
 \chapter{Implementation}
 \label{chap:implementation}
+This chapter details the specific changes made to the \ac{QIR}, the testbed configuration used for our evaluations, and the modifications implemented within MsQuic to enable and optimize \ac{XDP}.
 
-implementation goes here
+\section{Testbed Setup}
+\label{sec:testbed-setup}
+All measurements were performed on bare metal machines within the chair's testbed. Unless otherwise stated, each test node was equipped with an \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU and 32 GB of RAM. These nodes were selected because their hardware profile better reflects typical clients leveraging \ac{XDP} (especially mobile devices), which would not possess server-grade hardware capacity. Furthermore, this specific node type provided the necessary topology for conducting \ac{PTP} tests, as depicted in Figure~\ref{fig:qir-topology}.
+
+For network connectivity, \emph{Intel X552 10 GbE SFP+} \ac{NIC}s with the corresponding \texttt{ixgbe} driver version \emph{6.1.0-17-amd64} were utilized. Their 10 Gbit/s maximum throughput was sufficient to avoid becoming a bottleneck in our evaluations. Crucially, these \ac{NIC}s also offer hardware timestamping support, which is essential for accurate \ac{PTP} operation.
+
+% - Testbed setup
+%     - Talk about what sort of nodes were used. Perhaps justify using dogecoin beacuse of the
+%     PTP tests and because the XDP clients won't have insanely powerful CPUs typically. Also talk about the NICs used and the ixbge driver support for xdp-zerocopy and shit like that.
+%     - talk about needing both splitters for the PTP setup so you can capture the entire handshake, which is a requisite in decrypting the traffic.
+%     - Client server download test 
+
+\section{Integrating AF\_XDP into the QIR}
+\label{sec:msquic-extensions}
+MsQuic offers two build modes: Debug and Release. Debug mode includes extra features for diagnosing issues, while Release mode, which is designed for higher throughput, omits these. The following subsections detail the steps required to integrate both build modes with \ac{XDP} in the \ac{QIR}.
+
+Finally, unless mentioned otherwise, all modifications to MsQuic as part of this thesis were based off version 2.4.7~\footnote{https://github.com/microsoft/msquic/pkgs/container/msquic\%2Fqns/317647544?tag=v2.4.7}. 
+
+\subsection{XDP Program Flow}
+\label{subsec:xdp-program-flow}
+Figure~\ref{fig:xdp-program-flow} illustrates the logical execution flow of the loaded \ac{XDP} program. For every incoming packet, a series of checks are performed. Initially, the packet is examined to determine if it contains an IPv4 or IPv6 header. If it does, the \texttt{ip\_map} (an \ac{eBPF} map object as described in Subsection~\ref{subsec:ebpf-maps}) is consulted to verify if the destination IP address is a registered entry. If that check passes, the \texttt{port\_map} is similarly consulted. Should all preceding checks evaluate to true, the RX queue from the \ac{NIC} on which the packet arrived serves as a key within the \texttt{xsks\_map} to confirm the presence of a corresponding \texttt{AF\_XDP} socket. If confirmed, the packet is redirected to userspace using the \ac{XDP} action \texttt{XDP\_REDIRECT}. Otherwise, the packet proceeds through the normal network stack via the \texttt{XDP\_PASS} action. This non-invasive design allows the program to efficiently extract only packets relevant to MsQuic, while ensuring all other packets experience normal network processing.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.75\linewidth]{pics/xdp-program-flow.pdf}
+	\caption{XDP Program Flow.}
+	\label{fig:xdp-program-flow}
+\end{figure}
+
+\subsection{Fixing the Release Build Failure on Debian Bookworm}
+\label{subsec:release-mode}
+Before running \ac{QIR} tests, it was first necessary to build MsQuic and configure it as an artifact for \ac{QIR} consumption. We chose Debian Bookworm as the build environment, primarily due to its bare-bones nature. However, this immediately led to a significant hurdle. Namely, MsQuic's Release builds on the 2.4.7 version we were using were consistently failing.
+
+The error messages, a combination of \texttt{-Wstringop-overflow=} warnings turned to errors, served as red herrings due to there being no previous GitHub issues on the flagged parts of code. Fortunately, consulting the official MsQuic \ac{CI} workflow~\footnote{https://github.com/microsoft/msquic/actions} showed successful Release builds on Ubuntu 24.04~\footnote{https://releases.ubuntu.com/noble/}, which strongly suggested the build environment as the root cause. We subsequently identified that Debian's default \ac{GCC} version was 12.2.0, while Ubuntu utilized 13.2. Manually upgrading \ac{GCC} on our Debian system resolved the build failures.
+
+To completely eliminate this problem, further investigation showed a specific setting within the MsQuic repository that disabled warnings for \texttt{-Wstringop-overflow=} on \ac{GCC} versions 13 and newer. By adjusting this value to 12 and submitting a pull request~\footnote{https://github.com/microsoft/msquic/pull/4828}, we successfully enabled MsQuic Release builds for all Debian Bookworm environments.
+
+\subsection{Enabling XDP Within the Client}
+\label{subsec:enabling-xdp-within-quicinterop-client}
+Although MsQuic provided support for \ac{XDP}, it did not have the logic integrated into the \ac{QIR} client and server. Rather, it simply ran as part of an automated test suite. In order to adapt the client to run in the \ac{QIR}, a number of changes were required. For one, a new execution config was created to include the \texttt{QUIC\_EXECUTION\_CONFIG\_FLAG\_XDP} flag as seen in Listing~\ref{lst:xdp-datapath}. This forced the interop runner to use the \ac{XDP} datapath.
+
+\begin{lstlisting}[caption={Enabling the XDP Datapath}, label={lst:xdp-datapath}]
+    ...
+    Config->Flags = QUIC_EXECUTION_CONFIG_FLAG_XDP;
+    ...
+    if (QUIC_FAILED(Status = MsQuic->SetParam(
+                        nullptr,
+                        QUIC_PARAM_GLOBAL_EXECUTION_CONFIG,
+                        BufferLength,
+                        Config))) {
+        printf("SetParam failed, 0x%x!\n", Status);
+\end{lstlisting}
+
+With \ac{XDP} now successfully loading, the next steps included enabling transmissions and optimizing the \texttt{AF\_XDP} socket and UMEM creation, as introduced in Section~\ref{sec:xdp}. With respect to enabling the transmissions, a peculiar bug emerged during the first throughput test. Namely, the \ac{XDP} program loaded correctly, yet failed to initiate transmissions. Using Wireshark~\footnote{https://www.wireshark.org/} on the sniffer (depicted in Figure~\ref{fig:qir-topology}), we analyzed the client's outgoing packets. It became evident that the client was sending QUIC Initial packets with a destination MAC address of \texttt{00:00:00:00:00:00}. Since the server \ac{NIC} did not possess this physical address, it strongly suggested the \ac{XDP}-enabled client was unable to properly resolve the destination's MAC address.
+
+The resolution involved correctly resolving the destination IP address (as shown in Listing~\ref{lst:ip-neigh}) and subsequently setting the corresponding MAC address in the Neighbor Table, which then allowed transmissions to proceed.
+
+\begin{lstlisting}[caption={Hardcoding the IP and MAC address pair within the neighbor table}, label={lst:ip-neigh}]
+    DEST_IP=$(grep -w $addr /etc/hosts | awk '{print $1}')
+
+    # Update ARP table with retry logic
+    max_retries=5
+    retry_count=0
+    while ! ping -c 1 $DEST_IP; do
+    retry_count=$((retry_count + 1))
+    if [ $retry_count -ge $max_retries ]; then
+        echo "Failed to ping $DEST_IP after $max_retries attempts."
+        exit 1
+    fi
+    echo "Retrying ping ($retry_count/$max_retries)..."
+    sleep 1
+    done
+
+    # Extract destination MAC address for $DEST_IP from the neighbor table
+    MAC_ADDRESS=$(ip neigh show $DEST_IP dev $XDP_INTERFACE | awk '{print $3}')
+    # Replace entry to neighbor table.
+    ip neigh replace $DEST_IP lladdr $MAC_ADDRESS dev $XDP_INTERFACE
+\end{lstlisting}
+
+\subsection{Optimizing the \ac{XDP} Datapath}
+\label{subsec:optimizing-xdp}
+With data exchange now functioning between client and server, a new issue that immediately popped up was the significant amount of time that lapsed between running \texttt{run-client.sh} and data actually being transferred.
+
+To diagnose this, we utilized the perf tool~\footnote{https://perfwiki.github.io/main/} to analyze the client's \ac{CPU} activity during the first three seconds of execution. As highlighted by the purple band in Figure~\ref{fig:xdp-initialization-pre-opt}, the setup of the UMEM region and \texttt{AF\_XDP} sockets consumed approximately half of this 3-second trace. A deeper code inspection revealed that \ac{XDP} was allocating a UMEM region for every single queue across all available \ac{NIC}s on the device. Considering each UMEM region's size of around 100MB and there being multiple \ac{NIC}s present on the client, this led to substantial memory allocation overhead, compounded by the time required for the corresponding \texttt{AF\_XDP} sockets to be created. This logic was left over from the \ac{XDP} file's original purpose of running as part of a test suite and was no longer necessary.
+
+Thus, after two simple changes, we were rewarded with a drastic speed-up. The first change we made was using \texttt{ethtool} to combine all \ac{NIC} queues into one. The second involved adding an \texttt{-ifindex} flag to the \texttt{client.sh} script to specify the desired interface (and its corresponding \ac{NIC} queue) for binding. This let us bind the \ac{eBPF} program to a singular queue rather than the many from before. The improved performance, visibly represented by the much smaller purple bar, can be observed in Figure~\ref{fig:xdp-initialization-post-opt}.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.99\linewidth]{pics/DataPathInitialize_beforeOpt.png}
+	\caption{A 3-second perf trace was conducted on the XDP datapath initialization prior to optimization. \texttt{CxPlatDataPathInitialize}, the bar highlighted in purple, was responsible for approximately 50\% of the entire trace, resulting in a delayed transmission.}
+	\label{fig:xdp-initialization-pre-opt}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.99\linewidth]{pics/DataPathInitialize_afterOpt.png}
+	\caption{A subsequent 3-second perf trace was conducted on the XDP datapath initialization after optimization. The \texttt{CxPlatDataPathInitialize}, highlighted in purple, was reduced to ~7\% of the entire trace, drastically speeding up the connection.}
+	\label{fig:xdp-initialization-post-opt}
+\end{figure}
+
+\subsection{MsQuic Release-Mode Test Failures}
+\label{subsec:spontaneous-test-failures}
+During the \ac{XDP} bring-up, we encountered an additional, perplexing bug. Occasionally, throughput tests using MsQuic Release-mode artifacts would fail. Compounding the issue, these failures produced no discernible error messages, leaving us with minimal diagnostic information. The only clue was that Debug-mode artifacts consistently ran without such failures.
+
+The key difference between Debug and Release modes lay in the Release build's leaner debug content, which resulted in slightly faster transmission times for the same file sizes. This seemingly minor detail ultimately proved to be the crux of the problem. Because the \ac{XDP} program in Release-mode was encountering packets at a higher rate, it was also consuming the Fill descriptors as described in Subsection~ref{subsec:af-xdp-socket} at a higher rate. At certain throughput levels, these \ac{Fill} descriptors were not replenished quickly enough, leading directly to packet loss. To address this, we increased the number of UMEM frames~\footnote{\href{https://github.com/microsoft/msquic/blob/1160b80e09eda16d365b76491c798e9db9f47275/src/platform/datapath_raw_xdp_linux.c\#L30}{datapath\_raw\_xdp\_linux.c, Line 30}}. This ensured a larger pool of available descriptors, effectively accommodating the higher packet rates in MsQuic's Release mode.
+
+\subsection{Variation of Batch Sizes}
+\label{subsec:variation-of-batch-sizes}
+Relatedly, one of the tuneable parameters in the userspace \ac{XDP} logic is the batch size of the RX descriptors~\footnote{\href{https://github.com/microsoft/msquic/blob/1160b80e09eda16d365b76491c798e9db9f47275/src/platform/datapath_raw_xdp.h\#L14}{datapath\_raw\_xdp.h, Line 14}}. Given the ring buffer of RX descriptors available to userspace, it is possible to extract a variable number of descriptors in a single pass, up to the actual number available at that point in time. We therefore created multiple different variants that adapt the size of the receive buffer: \texttt{xdp-drv-zc-batch-\{1,2,4,8,32,64,128\}}. Each number corresponds to the size of the RX batch.
+
+\subsection{Driver Mode, Zero Copy Driver Mode, and SKB Mode}
+\label{subsec:driver-mode-skb-mode}
+As described in Section~\ref{sec:xdp}, there are two \ac{XDP} hook points: \texttt{XDP\_DRV} and \texttt{XDP\_SKB}. Additionally, on supported drivers and \ac{NIC}s, an \texttt{AF\_XDP} socket combined with \texttt{XDP\_DRV} can enable the zero-copy option~\cite{af_xdp_concept}. Figures~\ref{fig:skb-mode},~\ref{fig:xdp-no-zerocopy}, and~\ref{fig:xdp-zerocopy} illustrate the packet flow from \ac{NIC} arrival to UMEM copy for skb-mode, driver-mode without zero-copy, and driver-mode with zero-copy, respectively. To evaluate these scenarios, we developed three distinct variants: \texttt{xdp-skb}, \texttt{xdp-drv-no-zc}, and \texttt{xdp-drv-zc}, each corresponding to one of these versions.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.75\linewidth]{pics/skb-mode.pdf}
+	\caption{SKB mode. The \ac{NIC} \ac{DMA}s the packet into kernel memory. After an \texttt{sk\_buff} is allocated, the packet is then copied again from kernel memory into the UMEM.}
+	\label{fig:skb-mode}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.75\linewidth]{pics/no-xdp-zerocopy.pdf}
+	\caption{Driver mode, zero-copy not enabled. The \ac{NIC} \ac{DMA}s the packet into kernel memory, and the packet is copied from kernel memory into the UMEM.}
+	\label{fig:xdp-no-zerocopy}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.75\linewidth]{pics/xdp-zerocopy.pdf}
+	\caption{Driver mode with zero-copy. The \ac{NIC} \ac{DMA}s the packet directly into the UMEM.}
+	\label{fig:xdp-zerocopy}
+\end{figure}
+
+% XDP Changes:
+% - Updated the MsQuic interop runner to support XDP
+% - Talk about which branch you're basing your changes off of.
+% - Needing to specify the ip address within ip neigh to get it working.
+% - Reduced the time the interop runner spends setting up the UMEM region.
+% - Got MsQuic building in Release mode. Posted a patch to the main repository.
+% - Increasing the number of UMEM frames from the default. TODO
+% - Adapting the Linux datapath
+%     - Change the batching size
+%     - Change the zerocopy flags
+
+\section{Integrating Precision Time Protocol into the QIR}
+\label{sec:ptp-qir}
+Integrating \ac{PTP} into the \ac{QIR} involved several key steps. Initially, we added LinuxPTP as a Git submodule to the \ac{QIR}, as detailed in Subsection~\ref{subsec:ptp-tools}. This approach allowed for precise version control of the LinuxPTP dependency, which was advantageous for ensuring consistent \ac{PTP} configurations across all testing environments.
+
+Next, we introduced a \texttt{-ptp} flag to the \texttt{setup-hosts.sh} script within the \ac{QIR}. When activated, this flag configured each node as usual, and then used rsync~\footnote{https://linux.die.net/man/1/rsync} to transfer the ptp directory, which contained LinuxPTP and supplementary scripts, to the sniffer and client nodes. Concurrently, as detailed in Subsection~\ref{subsec:nic-hw-clocks}, we employed \texttt{tc} to limit the throughput of the server's sending interface. This was crucial to ensure the sniffer's \ac{NIC} could reliably generate hardware timestamps for each packet.
+
+Finally, the \texttt{sync-master.sh} and \texttt{sync-slave.sh} scripts were executed on the sniffer and client, respectively. These scripts, located within the ptp directory alongside \texttt{gPTP-master.cfg} and \texttt{gPTP-slave.cfg}, first installed the necessary \ac{PTP} tools (ptp4l, phc2sys, and pmc) on both machines. Thereafter, these tools were used to initiate the \ac{BMCA} and begin the clock synchronization processes.
+
+After synchronization, \texttt{phc2sys} was used on the sniffer to discipline the system clock (\texttt{CLOCK\_REALTIME}), as well as two specific interfaces: \texttt{eno8}, which consumed the packets routed through the client and splitter, and \texttt{eno7}, which consumed the packets routed from through server and splitter. On the client, \texttt{phc2sys} was solely used to discipline the system time.
+
+Finally, as a sanity check, LinuxPTP also provides a script \texttt{check\_clocks} to verify that \texttt{CLOCK\_REALTIME} is properly disciplined. Since a similar tool was unavailable for the \ac{PHC}s also being disciplined (specifically, \texttt{eno7} and \texttt{eno8} on the sniffer as seen in Figure~\ref{fig:ptp-topology}), we created the script \texttt{check\_phcs} to do an equivalent check.
+
+\subsection{Measuring the Network Stack Traversal Time}
+\label{subsec:the-experiment}
+Our fundamental objective in using \ac{PTP} was to precisely measure the time a packet takes to travel from the \ac{NIC} to userspace, effectively quantifying its traversal of the 'network stack.' To achieve this, we deployed a \texttt{tcpdump}~\footnote{https://www.tcpdump.org/} instance on the sniffer to capture messages exchanged between the client and server. For maximum timestamp accuracy, \texttt{tcpdump} was configured with the \texttt{-j adapter\_unsynced} and \texttt{--time-stamp-precision=nano} flags, ensuring the use of hardware timestamps generated by the \ac{NIC} at nanosecond resolution.
+
+As the length of the physical links running from the splitter to the client's and sniffer's \ac{NIC}s were about equal, the sniffer's hardware timestamp served as a reliable proxy for the packet's arrival time on the client's \ac{NIC}. Furthermore, because the sniffer's interfaces were disciplined to the same \ac{PTP} clock as the client's system time, we were confident that the userspace log time grew in lockstep with the \ac{NIC} arrival time. We opted for the sniffer-based \texttt{tcpdump} approach over running it on the client to avoid introducing additional load that could disturb the measurements.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.85\linewidth]{pics/quic-header.pdf}
+	\caption{QUIC Header. To access the Packet Number, decryption must first take place.}
+	\label{fig:quic-header-decryption}
+\end{figure}
+
+By using various datapaths such as \ac{XDP}, \ac{DPDK}, and the normal network stack, we could evaluate the 'network traversal' times against each other. A crucial prerequisite for this analysis, however, was packet decryption. As seen in Figure~\ref{fig:quic-header-decryption}, packet numbers are encrypted. This meant a decryption step first needed to occur.
+
+Utilizing the MsQuic logging stack for Linux as detailed in Subsection~\ref{subsec:logging}, we created a new trace event, \texttt{LogPacketNumberWithTimestamp}, as seen in Listing~\ref{lst:trace-event}. This event was invoked immediately after packet number decryption~\footnote{\href{https://github.com/microsoft/msquic/blob/5356efae82b8ef5320e4bfcae90ca3641aec6b8f/src/core/connection.c\#L4068}{connection.c, line 4068}}. 
+
+Upon completion of the test, we used \texttt{babeltrace}~\footnote{https://babeltrace.org/} to convert the LTTng data into a human-readable, structured format. Then, to extract only the necessary information from the output, we introduce one more script, \texttt{quic.babel.txt-to-json.py}, which pulls the packet number and the timestamp into a \ac{JSON} file. 
+
+\begin{lstlisting}[caption={LogPacketNumberWithTimestamp Trace Event}, label={lst:trace-event}]
+    QuicTraceEvent(
+            LogPacketNumberWithTimestamp,
+            "[domi] Packet Number: %llu",
+            Packet->PacketNumber);
+\end{lstlisting}
+
+Finally, we integrated two pre- and post-scripts to streamline data collection. The \texttt{start-ptp-tcpdump.sh} script handled the initial setup, downloading \texttt{tcpdump} and \texttt{tcpshark}, and launching two \texttt{tcpdump} instances. One instance was used to capture traffic from the server via the splitter, and the other for capturing the traffic coming from the client via the splitter.
+
+Once data collection finished, the \texttt{stop-ptp-tcpdump.sh} script combined these two .pcap files into one. This consolidation was crucial for capturing the entire QUIC handshake, which is essential for accurate decryption of all subsequent packets. Next, we used \texttt{quic-analyzer.py} to process this .pcap file, extracting only the relevant timestamps and packet numbers into a JSON file.
+
+The final step involved correlating these two data sources. To do this, we zipped the LTTng JSON file with our newly generated pcap JSON file. This allowed us to calculate the network stack traversal time by subtracting the userspace timestamp (from LTTng) from the NIC timestamp (from the pcap file).
+
+% PTP Changes:
+% - Added PTP support. Made sure to activate it in setup_hosts.
+% - Created a script to convert the lttng output into a nice formatted json.
+% - Created more scripts to combine the data (not sure if this is necessary).
+% - Creating another file to see whether the other NICs are in sync.
