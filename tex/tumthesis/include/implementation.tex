@@ -178,7 +178,7 @@ By using various datapaths such as \ac{XDP}, \ac{DPDK}, and the normal network s
 
 Utilizing the MsQuic logging stack for Linux as detailed in Subsection~\ref{subsec:logging}, we created a new trace event, \texttt{LogPacketNumberWithTimestamp}, as seen in Listing~\ref{lst:trace-event}. This event was invoked immediately after packet number decryption~\footnote{\href{https://github.com/microsoft/msquic/blob/5356efae82b8ef5320e4bfcae90ca3641aec6b8f/src/core/connection.c\#L4068}{connection.c, line 4068}}. 
 
-Upon completion of the test, we used \texttt{babeltrace}~\footnote{https://babeltrace.org/} to convert the LTTng data into a human-readable, structured format. Then, to extract only the necessary information from the output, we introduce one more script, \texttt{quic.babel.txt-to-json.py}, which pulls the packet number and the timestamp into a \ac{JSON} file. 
+Upon completion of the test, we used \texttt{babeltrace}~\footnote{https://babeltrace.org/} to convert the LTTng data into a human-readable, structured format. Then, to extract only the necessary information from the output, we introduce one more script, \texttt{quic.babel.txt-to-json.py}, which pulls the packet number and the timestamp into a JSON file. 
 
 \begin{lstlisting}[caption={LogPacketNumberWithTimestamp Trace Event}, label={lst:trace-event}]
     QuicTraceEvent(
