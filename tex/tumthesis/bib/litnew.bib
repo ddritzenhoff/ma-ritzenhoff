@@ -60,6 +60,27 @@
 @STRING{usenix_fast={Conference on File and Storage Technologies (\sc{FAST})} }
 @STRING{ieee_wts= {{\sc{IEEE}} Wireless Telecommunications Symposium (\sc{WTS})} }
 
+@misc{xdp_multibuff_2019,
+  author = {Lorenzo Bianconi and Eelco Chaudron and Jesper Dangaard Brouer and Toke H{\o}iland-J{\o}rgensen},
+  title = {Bringing TSO/GRO and Jumbo
+frames to XDP},
+  howpublished = {Linux Plumbers Conference},
+  year = {2021},
+  note = {Contribution to Linux Plumbers Conference 2021},
+  url = {https://lpc.events/event/11/contributions/939/attachments/771/1551/xdp-multi-buff.pdf},
+  urldate = {2025-07-11}
+}
+
+@inproceedings{2018AFXDPPerf,
+  author    = {Magnus Karlsson and Björn Töpel},
+  title     = {The Path to DPDK Speedsfor AF\_XDP},
+  booktitle = {Linux Plumbers Conference 2018},
+  year      = {2018},
+  month     = {November},
+  url       = {http://oldvger.kernel.org/lpc_net2018_talks/lpc18_paper_af_xdp_perf-v2.pdf},
+  urldate   = {2025-07-11}
+}
+
 @manual{CiscoPTP,
   title        = {Configuring Precision Time Protocol (PTP)},
   author       = {Cisco},
@@ -203,6 +224,15 @@
     year =      2022,
     month =     aug,
     abstract =  {This document describes a method for negotiating the ability to send an arbitrary value for the second-most significant bit in QUIC packets.},
+}
+
+@online{af_xdp_driver_support,
+  author = {Isovalent},
+  title = {Program type BPF\_PROG\_TYPE\_XDP},
+  year = {2025},
+  url = {https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_XDP/#driver-support},
+  urldate = {2025-07-01},
+  organization = {Isovalent},
 }
 
 @online{af_xdp_concept,
