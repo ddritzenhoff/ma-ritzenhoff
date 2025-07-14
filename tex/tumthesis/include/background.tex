@@ -11,7 +11,7 @@ Google, the original developer of QUIC, was already serving 50\% of all requests
 \begin{figure}
 	\centering
     \includegraphics[width=.50\linewidth]{pics/quic-stack}
-	\caption{HTTP/2 and HTTP/3 Network Stacks.}
+	\caption[HTTP/2 and HTTP/3 Network Stacks.]{HTTP/2 and HTTP/3 Network Stacks.}
 	\label{fig:network-stacks}
 \end{figure}
 
@@ -22,7 +22,7 @@ QUIC was specifically designed to overcome several of \ac{TCP}'s inherent shortc
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/hol-blocking}
-	\caption{TCP and QUIC Streams with Packet Loss. The TCP client will receive all packets from the three streams but packet 4, which went missing. Head-of-Line blocking ensures that the HTTP/2 client only receives packets 1, 2, and 3. Packet 4 must be resent for the client to receive any more. The QUIC client will receive all packets but packet 4. The HTTP/3 client will receive all packets but packets 4, 5, and 11. Only the packets from one stream are blocked.}
+	\caption[Head-of-Line Blocking.]{TCP and QUIC Streams with Packet Loss. The TCP client will receive all packets from the three streams but packet 4, which went missing. Head-of-Line blocking ensures that the HTTP/2 client only receives packets 1, 2, and 3. Packet 4 must be resent for the client to receive any more. The QUIC client will receive all packets but packet 4. The HTTP/3 client will receive all packets but packets 4, 5, and 11. Only the packets from one stream are blocked.}
 	\label{fig:hol-blocking}
 \end{figure}
 
@@ -37,7 +37,7 @@ With \ac{TCP}+\ac{TLS}, a round trip is needed to establish the \ac{TCP} connect
 \begin{figure}
 	\centering
     \includegraphics[width=.75\linewidth]{pics/quic-tcp-handshakes}
-	\caption{Handshake Comparison Between TCP and QUIC.}
+	\caption[Handshake Comparison Between TCP and QUIC.]{Handshake Comparison Between TCP and QUIC.}
 	\label{fig:quic-tcp-handshakes}
 \end{figure}
 
@@ -66,14 +66,14 @@ This all goes to say that QUIC itself is not a silver bullet, and there exist ma
 \begin{figure}
 	\centering
     \includegraphics[width=.85\linewidth]{pics/memory_bandwidth_TCP_kTLS_sendfile.pdf}
-	\caption{Maximum Memory Bandwidth with TCP}
+	\caption[Maximum Memory Bandwidth with TCP.]{Maximum Memory Bandwidth with TCP.}
 	\label{fig:memory-bandwidth-TCP}
 \end{figure}
 
 \begin{figure}
 	\centering
     \includegraphics[width=.85\linewidth]{pics/memory_bandwidth_QUIC.pdf}
-	\caption{Maximum Memory Bandwidth with QUIC}
+	\caption[Maximum Memory Bandwidth with QUIC.]{Maximum Memory Bandwidth with QUIC.}
 	\label{fig:memory-bandwidth-QUIC}
 \end{figure}
 
@@ -117,7 +117,7 @@ Depending on the hook point, a given \ac{eBPF} program will have access to a num
 \begin{figure}
 	\centering
     \includegraphics[width=.75\linewidth]{pics/bpf_map}
-	\caption{BPF Map}
+	\caption[BPF Map.]{BPF Map.}
 	\label{fig:bpf-map}
 \end{figure}
 
@@ -173,7 +173,7 @@ One stipulation to loading an \ac{XDP} program is that it may only be attached t
 \begin{figure}
 	\centering
 	\includegraphics[width=.85\linewidth]{pics/xdp_receive_path}
-	\caption{XDP Hook Points}
+	\caption[XDP Hook Points.]{XDP Hook Points.}
 	\label{fig:xdp-receive-path}
 \end{figure}
 
@@ -263,7 +263,7 @@ Immediately after allocating the UMEM region, the userspace process contains own
 \begin{figure}
 	\centering
     \includegraphics[width=.85\linewidth]{pics/umem-1}
-	\caption{UMEM After Initialization. Adapted from \cite{af_xdp_concept}.}
+	\caption[UMEM After Initialization.]{UMEM After Initialization. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:umem-after-initialization}
 \end{figure}
 
@@ -274,14 +274,14 @@ The userspace application then yields ownership of a specified number of UMEM ch
 \begin{figure}
 	\centering
     \includegraphics[width=.85\linewidth]{pics/umem-2}
-	\caption{UMEM Chunks Owned by Fill Queue. Adapted from \cite{af_xdp_concept}.}
+	\caption[UMEM Chunks Owned by Fill Queue.]{UMEM Chunks Owned by Fill Queue. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:umem-owned-by-fill-queue}
 \end{figure}
 
 \begin{figure}
 	\centering
     \includegraphics[width=.85\linewidth]{pics/umem-3}
-	\caption{UMEM Chunks Owned by Kernel. Adapted from \cite{af_xdp_concept}.}
+	\caption[UMEM Chunks Owned by Kernel.]{UMEM Chunks Owned by Kernel. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:umem-owned-by-kernel}
 \end{figure}
 
@@ -290,7 +290,7 @@ Once the packets have been copied into the UMEM chunks controlled by the kernel,
 \begin{figure}
 	\centering
     \includegraphics[width=.85\linewidth]{pics/umem-4}
-	\caption{Kernel Adds Descriptors to RX Queue. Adapted from \cite{af_xdp_concept}.}
+	\caption[UMEM after Kernel Adds Descriptors to RX Queue.]{UMEM after Kernel Adds Descriptors to RX Queue. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:add-descs-to-fill-queue}
 \end{figure}
 
@@ -299,7 +299,7 @@ Once the kernel has consumed a descriptor from the RX queue, the userspace appli
 \begin{figure}
 	\centering
     \includegraphics[width=.85\linewidth]{pics/umem-5}
-	\caption{Process Adds Descriptor to TX Queue. Adapted from \cite{af_xdp_concept}.}
+	\caption[UMEM after MsQuic Adds Descriptor to TX Queue.]{UMEM after MsQuic Adds Descriptor to TX Queue. Adapted from \cite{af_xdp_concept}.}
 	\label{fig:add-desc-to-tx-queue}
 \end{figure}
 
@@ -336,7 +336,7 @@ Within Linux, three primary tools are used to carry out the clock synchronizatio
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/ptp-topology2}
-	\caption{A PTP Topology showing \texttt{phc2sys} usage. \texttt{eno6} on the sniffer disciplines the system time and the \ac{PHC}s corresponding to \texttt{eno8} and \texttt{eno7}. \texttt{eno6} on the client also disciplines the system time using \texttt{phc2sys}. Synchronizing \texttt{eno7}'s \ac{PHC} on the sniffer with \texttt{eno6}'s \ac{PHC} necessitates an additional port and interface on \texttt{eno7}'s \ac{NIC}. This auxiliary port would establish a \ac{PTP} link to an extra port on \texttt{eno6}'s \ac{NIC}, which would allow \texttt{eno7} to continue capturing traffic while the auxiliary interface disciplines the shared \ac{PHC} via its slave-master relationship with \texttt{eno6}. The same principle applies to \texttt{eno8}.}
+    \caption[A PTP Topology showing phc2sys usage for system time and PHC discipline.]{A PTP Topology showing \texttt{phc2sys} usage. \texttt{eno6} on the sniffer disciplines the system time and the \ac{PHC}s corresponding to \texttt{eno8} and \texttt{eno7}. \texttt{eno6} on the client also disciplines the system time using \texttt{phc2sys}. Synchronizing \texttt{eno7}'s \ac{PHC} on the sniffer with \texttt{eno6}'s \ac{PHC} necessitates an additional port and interface on \texttt{eno7}'s \ac{NIC}. This auxiliary port would establish a \ac{PTP} link to an extra port on \texttt{eno6}'s \ac{NIC}, which would allow \texttt{eno7} to continue capturing traffic while the auxiliary interface disciplines the shared \ac{PHC} via its slave-master relationship with \texttt{eno6}. The same principle applies to \texttt{eno8}.}
 	\label{fig:ptp-topology}
 \end{figure}
 
@@ -371,7 +371,7 @@ As a word of caution, it is important to note that some \ac{NIC}s may only offer
 \begin{figure}
 	\centering
     \includegraphics[width=.85\linewidth]{pics/ptp-timestamping2}
-	\caption{PTP Timestamping Options. Adapted from \cite{rosel2021ptp}.}
+	\caption[PTP Timestamping Options.]{PTP Timestamping Options. Adapted from \cite{rosel2021ptp}.}
 	\label{fig:ptp-timestamping-options}
 \end{figure}
 
@@ -382,7 +382,7 @@ To maintain its high resolution, \ac{PTP} employs a hierarchy of clocks, each of
 \begin{figure}
 	\centering
     \includegraphics[width=.75\linewidth]{pics/ptp-topology3}
-	\caption{Example \ac{PTP} Network with Pruning.}
+	\caption[Example \ac{PTP} Network with Pruning.]{Example \ac{PTP} Network with Pruning.}
 	\label{fig:ptp-network-with-pruning}
 \end{figure}
 
@@ -407,7 +407,7 @@ A key advantage of Transparent Clocks is their ability to achieve a flatter \ac{
 \begin{figure}
 	\centering
     \includegraphics[width=.85\linewidth]{pics/ptp-tc-sync}
-	\caption{Transparent Clock behavior in a P2P \ac{PTP} Setup. RT is the residence time, which represents the amount of time the message spent within the \ac{TC}. This value is added to \texttt{CorrectionField} as described in Subsubsection~\ref{subsubsec:transparent-clock}. Adapted from \cite{NetworkLessonsPTP}.}
+	\caption[Transparent Clock Behavior in a P2P \ac{PTP} Setup.]{Transparent Clock behavior in a P2P \ac{PTP} Setup. RT is the residence time, which represents the amount of time the message spent within the \ac{TC}. This value is added to \texttt{CorrectionField} as described in Subsubsection~\ref{subsubsec:transparent-clock}. Adapted from \cite{NetworkLessonsPTP}.}
 	\label{fig:ptp-tc-sync}
 \end{figure}
 
@@ -457,14 +457,14 @@ Finally, it's important to note that Figure~\ref{fig:ptp-synchronization} depict
 \begin{figure}
 	\centering
     \includegraphics[width=.90\linewidth]{pics/ptp-rate-sync2}
-	\caption{\ac{PTP} message exchange for clock frequency difference calculation using the Peer-to-Peer Method. Adapted from \cite{MobatimePTP}.}
+	\caption[\ac{PTP} Clock Frequency Difference Calculation]{\ac{PTP} message exchange for clock frequency difference calculation using the Peer-to-Peer Method. Adapted from \cite{MobatimePTP}.}
 	\label{fig:ptp-frequency-synchronization}
 \end{figure}
 
 \begin{figure}
 	\centering
     \includegraphics[width=.90\linewidth]{pics/ptp-rate-sync}
-	\caption{\ac{PTP} message exchange for delay and offset calculations using the Peer-to-Peer Method. Adapted from \cite{MobatimePTP}.}
+	\caption[\ac{PTP} Delay and Offset Calculations]{\ac{PTP} message exchange for delay and offset calculations using the Peer-to-Peer Method. Adapted from \cite{MobatimePTP}.}
 	\label{fig:ptp-synchronization}
 \end{figure}
 
@@ -482,7 +482,7 @@ This modular design also allows for fine-grained control over the datapath, whic
 \begin{figure}
 	\centering
     \includegraphics[width=.65\linewidth]{pics/buffers.pdf}
-	\caption{Components of the default packet datapath.}
+	\caption[Components of the Default Packet Datapath.]{Components of the default packet datapath.}
 	\label{fig:buffers}
 \end{figure}
 
@@ -493,7 +493,7 @@ With packets now present in the RX buffer, the \ac{NIC} driver is invoked. It cr
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/recvfrom(2)v2.pdf}
-	\caption{Receiving with \texttt{recvfrom(2)}.}
+	\caption[Receiving with \texttt{recvfrom(2)}.]{Receiving with \texttt{recvfrom(2)}.}
 	\label{fig:recvfrom}
 \end{figure}
 
@@ -504,7 +504,7 @@ As seen in Figure~\ref{fig:recvmmsg}, the \texttt{recvmmsg(2)} system call repre
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/recvmmsg(2)v2.pdf}
-	\caption{Receiving with \texttt{recvmmsg(2)}.}
+	\caption[Receiving with \texttt{recvmmsg(2)}.]{Receiving with \texttt{recvmmsg(2)}.}
 	\label{fig:recvmmsg}
 \end{figure}
 
@@ -515,7 +515,7 @@ One downside to the approaches above is that an \texttt{sk\_buff} is allocated f
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/grov2.pdf}
-	\caption{Receiving with \ac{GRO}.}
+	\caption[Receiving with \ac{GRO}.]{Receiving with \ac{GRO}.}
 	\label{fig:gro}
 \end{figure}
 
@@ -524,7 +524,7 @@ Finally, we can combine these two enhancements together as seen in Figure~\ref{g
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/recvmmsg(2)+grov2.pdf}
-	\caption{Receiving with \ac{GRO} and \texttt{recvmmsg(2)}.}
+	\caption[Receiving with \ac{GRO} and \texttt{recvmmsg(2)}.]{Receiving with \ac{GRO} and \texttt{recvmmsg(2)}.}
 	\label{fig:gro-recvmmsg}
 \end{figure}
 
@@ -543,7 +543,7 @@ The core advantage of the \ac{QIR} framework lies in its emphasis on repeatabili
 \begin{figure}
 	\centering
     \includegraphics[width=.85\linewidth]{pics/qir-topology}
-	\caption{Measurement topology of the \ac{QIR} with dedicated hardware.}
+	\caption[Measurement Topology of the \ac{QIR}.]{Measurement topology of the \ac{QIR} with dedicated hardware.}
 	\label{fig:qir-topology}
 \end{figure}
 

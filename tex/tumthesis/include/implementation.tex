@@ -27,7 +27,7 @@ Figure~\ref{fig:xdp-program-flow} illustrates the logical execution flow of the 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/xdp-program-flow.pdf}
-	\caption{XDP Program Flow.}
+	\caption[XDP Program Flow.]{XDP Program Flow.}
 	\label{fig:xdp-program-flow}
 \end{figure}
 
@@ -92,14 +92,14 @@ Thus, after two simple changes, we were rewarded with a drastic speed-up. The fi
 \begin{figure}
 	\centering
 	\includegraphics[width=.99\linewidth]{pics/DataPathInitialize_beforeOpt.png}
-	\caption{A 3-second perf trace was conducted on the XDP datapath initialization prior to optimization. \texttt{CxPlatDataPathInitialize}, the bar highlighted in purple, was responsible for approximately 50\% of the entire trace, resulting in a delayed transmission.}
+	\caption[XDP Datapath Initialization before Optimization.]{A 3-second perf trace was conducted on the XDP datapath initialization prior to optimization. \texttt{CxPlatDataPathInitialize}, the bar highlighted in purple, was responsible for approximately 50\% of the entire trace, resulting in a delayed transmission.}
 	\label{fig:xdp-initialization-pre-opt}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.99\linewidth]{pics/DataPathInitialize_afterOpt.png}
-	\caption{A subsequent 3-second perf trace was conducted on the XDP datapath initialization after optimization. The \texttt{CxPlatDataPathInitialize}, highlighted in purple, was reduced to ~7\% of the entire trace, drastically speeding up the connection.}
+	\caption[XDP Datapath Initialization after Optimization.]{A subsequent 3-second perf trace was conducted on the XDP datapath initialization after optimization. The \texttt{CxPlatDataPathInitialize}, highlighted in purple, was reduced to ~7\% of the entire trace, drastically speeding up the connection.}
 	\label{fig:xdp-initialization-post-opt}
 \end{figure}
 
@@ -120,21 +120,21 @@ As described in Section~\ref{sec:xdp}, there are two \ac{XDP} hook points: \text
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/skb-mode.pdf}
-	\caption{SKB mode. The \ac{NIC} \ac{DMA}s the packet into kernel memory. After an \texttt{sk\_buff} is allocated, the packet is then copied again from kernel memory into the UMEM.}
+	\caption[Packet Traversal with \texttt{AF\_XDP} SKB Mode.]{SKB mode. The \ac{NIC} \ac{DMA}s the packet into kernel memory. After an \texttt{sk\_buff} is allocated, the packet is then copied again from kernel memory into the UMEM.}
 	\label{fig:skb-mode}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/no-xdp-zerocopy.pdf}
-	\caption{Driver mode, zero-copy not enabled. The \ac{NIC} \ac{DMA}s the packet into kernel memory, and the packet is copied from kernel memory into the UMEM.}
+	\caption[Packet Traversal with \texttt{AF\_XDP} Driver Mode and Zero-copy Disabled.]{Driver mode, zero-copy not enabled. The \ac{NIC} \ac{DMA}s the packet into kernel memory, and the packet is copied from kernel memory into the UMEM.}
 	\label{fig:xdp-no-zerocopy}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/xdp-zerocopy.pdf}
-	\caption{Driver mode with zero-copy. The \ac{NIC} \ac{DMA}s the packet directly into the UMEM.}
+	\caption[Packet Traversal with \texttt{AF\_XDP} Driver Mode and Zero-copy Enabled.]{Driver mode with zero-copy. The \ac{NIC} \ac{DMA}s the packet directly into the UMEM.}
 	\label{fig:xdp-zerocopy}
 \end{figure}
 
@@ -170,7 +170,7 @@ As the length of the physical links running from the splitter to the client's an
 \begin{figure}
 	\centering
 	\includegraphics[width=.85\linewidth]{pics/quic-header.pdf}
-	\caption{QUIC Header. To access the Packet Number, decryption must first take place.}
+	\caption[Encryption within the QUIC Header.]{QUIC Header. To access the Packet Number, decryption must first take place.}
 	\label{fig:quic-header-decryption}
 \end{figure}
 
