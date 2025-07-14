@@ -49,7 +49,7 @@ To further combat ossification, QUIC also employs a technique known as greasing.
 
 \subsection{Connection Migration}
 \label{subsec:connection-migration}
-Unlike \ac{TCP}, which binds connections to the source and destination IP addresses and ports, QUIC maintains connections with a \ac{CID}. The advantage is that it allows QUIC to migrate across underlying network changes, such as from Wi-Fi to cellular data, without needing to re-establish the entire connection, as is the case for \ac{TCP}. Even when the source IP changes, the client may continue using the same \ac{CID}. This is especially useful for mobile environments given the almost ubiquitous support of both Wi-Fi and cellular.
+Unlike \ac{TCP}, which binds connections to the source and destination IP addresses and ports, QUIC maintains connections with \ac{CID}s. The advantage is that it allows QUIC to migrate across underlying network changes, such as from Wi-Fi to cellular data, without needing to re-establish the entire connection, as is the case for \ac{TCP}. Even when the source IP changes, the client may continue using the same \ac{CID}. This is especially useful for mobile environments given the almost ubiquitous support of both Wi-Fi and cellular.
 
 \subsection{Packet Ambiguity}
 \label{subsec:packet-ambiguity}
@@ -536,7 +536,7 @@ MsQuic generates logs and traces using CLOG~\cite{MsQuicDiagnostics}, a cross-pl
 \label{sec:pos-measurement-framework} 
 Measurements for this thesis utilized a modified \ac{QIR} framework, as described by Jaeger et al.~\cite{10186365}. This setup exclusively uses bare metal machines, eliminating potential noise introduced by virtualization software. The network topology for these measurements is detailed in Figure~\ref{fig:qir-topology}.
 
-For each measurement, a file-download scenario between a client and server was executed, allowing for throughput inference. A dedicated management node was responsible for resetting machines to a baseline state (e.g., Debian Bookworm) and distributing necessary files and environment variables. Splitters were incorporated as non-invasive means to duplicate packets exchanged between the client and server, enabling the sniffer to capture them, which was crucial for \ac{PTP} tests.
+For each measurement, a file-download scenario between a client and server was executed, allowing for throughput inference. A dedicated management node was responsible for resetting machines to a baseline state (e.g., Debian Bookworm) and distributing necessary files and environment variables. Passive optical fiber taps (a.k.a. splitters) were incorporated as non-invasive means to duplicate packets exchanged between the client and server, enabling the sniffer to capture them, which was crucial for \ac{PTP} tests.
 
 The core advantage of the \ac{QIR} framework lies in its emphasis on repeatability. It allows for the declarative specification of runtime environments, QUIC implementations, test types, and pre- and post-processing steps, all handled automatically by the \ac{QIR}.
 
