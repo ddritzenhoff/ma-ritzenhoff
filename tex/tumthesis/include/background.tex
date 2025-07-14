@@ -1,12 +1,12 @@
 \chapter{Background}
 \label{chap:background}
-This chapter lays the groundwork for our investigations by covering several key areas. We first provide foundational information on the QUIC protocol by comparing it to \ac{TCP}. Subsequently, we cover \ac{eBPF} and \ac{XDP}, followed by an introduction to \ac{PTP}, and finally, an overview of the \ac{QIR} framework.
+This chapter lays the groundwork for our investigations by covering several key areas. We first provide foundational information on the QUIC protocol by comparing it to \ac{TCP}. Subsequently, we cover \ac{eBPF}, \ac{XDP}, and AF\_XDP, followed by an introduction to \ac{PTP}, and finally, an overview of the \ac{QIR} framework.
 
 \section{A TCP and QUIC Comparison}
 \label{sec:the-quic-protocol}
-QUIC~\cite{rfc9000} is a next-generation transport protocol developed to address the inherent limitations of protocols like \ac{TCP} and \ac{TLS}. It offers several key advantages: a combined transport and cryptographic handshake for faster connection establishment, native stream multiplexing to prevent head-of-line blocking and improve throughput resilience to packet loss, robust connection migration for seamless transitions between networks, and easier deployment.
+QUIC~\cite{rfc9000} is a next-generation transport protocol developed to address the inherent limitations of protocols like \ac{TCP} and \ac{TLS}. It offers several key advantages: a combined transport and cryptographic handshake for faster connection establishment, native stream multiplexing to prevent head-of-line blocking and improved throughput resilience to packet loss, robust connection migration for seamless transitions between networks, and easier deployment.
 
-Google, the original developer of QUIC, was already serving 50\% of all requests to Google services from Chrome browsers over QUIC by 2015~\cite{chromium_quic_2015}. Today, \ac{HTTP/3}, which uses QUIC, is enabled by default on Chrome browsers~\cite{chromium_quicer_2024}. These statistics underscore the protocol's clear benefits and its widespread adoption across the Internet. Figure~\ref{fig:network-stacks} illustrates the respective technology stacks of \ac{HTTP/3} and its predecessor, \ac{HTTP/2}. The following paragraphs dive deeper into implications of such changes.
+Google, the original developer of QUIC, was already serving 50\% of all requests to Google services from Chrome browsers over QUIC by 2015~\cite{chromium_quic_2015}. Today, \ac{HTTP/3}, which uses QUIC, is enabled by default on Chrome browsers~\cite{chromium_quicer_2024}. These statistics underscore the protocol's clear benefits and its widespread adoption across the Internet. Figure~\ref{fig:network-stacks} illustrates the respective technology stacks of \ac{HTTP/3} and its predecessor, HTTP/2. The following paragraphs dive deeper into implications of such changes.
 
 \begin{figure}
 	\centering
@@ -17,12 +17,12 @@ Google, the original developer of QUIC, was already serving 50\% of all requests
 
 \subsection{Head-of-Line Blocking}
 \label{subsec:hol-blocking}
-QUIC was specifically designed to overcome several of \ac{TCP}'s inherent shortcomings, most notably \ac{HoL} blocking. Similar to QUIC, \ac{TCP}'s design mandates the in-order delivery of packets within a single connection. However, the problem in \ac{TCP} arises when even a single packet is delayed or dropped en-route. For higher-level protocols like \ac{HTTP/2} that build off \ac{TCP}, this means all subsequent packets are forced to wait for the retransmission of the lost packet, irrespective of the application-level stream they belong to. Figure~\ref{fig:hol-blocking} illustrates this phenomenon. Consequently, this property makes \ac{HTTP/2} highly vulnerable to performance degradation from packet loss, especially when utilizing multiple streams. With QUIC, the concept of streams is native to the protocol itself, which lets \ac{HTTP/3} effectively multiplex without any risk of \ac{HoL} blocking.
+QUIC was specifically designed to overcome several of \ac{TCP}'s inherent shortcomings, most notably \ac{HoL} blocking. Similar to QUIC, \ac{TCP}'s design mandates the in-order delivery of packets within a single connection. However, the problem in \ac{TCP} arises when even a single packet is delayed or dropped en-route. For higher-level protocols like HTTP/2 that build off \ac{TCP}, this means all subsequent packets are forced to wait for the retransmission of the lost packet, irrespective of the application-level stream they belong to. Figure~\ref{fig:hol-blocking} illustrates this phenomenon. Consequently, this property makes HTTP/2 highly vulnerable to performance degradation from packet loss, especially when utilizing multiple streams. With QUIC, the concept of streams is native to the protocol itself, which lets \ac{HTTP/3} effectively multiplex without any risk of \ac{HoL} blocking.
 
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/hol-blocking}
-	\caption[Head-of-Line Blocking.]{TCP and QUIC Streams with Packet Loss. The TCP client will receive all packets from the three streams but packet 4, which went missing. Head-of-Line blocking ensures that the HTTP/2 client only receives packets 1, 2, and 3. Packet 4 must be resent for the client to receive any more. The QUIC client will receive all packets but packet 4. The HTTP/3 client will receive all packets but packets 4, 5, and 11. Only the packets from one stream are blocked.}
+	\caption[Head-of-Line Blocking.]{TCP and QUIC Streams with Packet Loss. The TCP client will receive all packets from the three streams but packet 4, which went missing. Head-of-Line blocking ensures that the HTTP/2 client only receives packets 1, 2, and 3. Packet 4 must be resent for the HTTP/2 client to receive any subsequent packets. The QUIC client will receive all packets but packet 4. The HTTP/3 client will receive all packets but 4, 5, and 11, which are part of the one stream that is blocked.}
 	\label{fig:hol-blocking}
 \end{figure}
 
@@ -32,7 +32,7 @@ Integrating \ac{TCP}'s codebase directly within the operating system kernel, whi
 
 \subsection{Transport and Cryptographic Handshakes}
 \label{subsec:combined-transport-and-cryptographic-handshakes}
-With \ac{TCP}+\ac{TLS}, a round trip is needed to establish the \ac{TCP} connection, and another round trip is then required to make it secure. QUIC, however, integrates \ac{TLS} directly into its protocol, combining these two steps into a single handshake, as illustrated in Figure~\ref{fig:quic-tcp-handshakes}. This integration typically leads to a reduced time-to-first-byte. Additionally, in the special case that QUIC has previously communicated with a server, it can leverage cached cryptographic parameters and connection settings to transmit application data during the very first round-trip. This is known as \ac{0-RTT}. 
+With \ac{TCP}+\ac{TLS}, a round trip is needed to establish the \ac{TCP} connection, and another round trip is then required to make it secure. QUIC, however, integrates \ac{TLS} directly into its protocol, combining these two steps into a single handshake, as illustrated in Figure~\ref{fig:quic-tcp-handshakes}. This integration typically leads to a reduced time-to-first-byte. Additionally, in the special case that QUIC has previously communicated with a server, it can leverage cached cryptographic parameters and connection settings to transmit application data during the very first round-trip~\cite{rfc9000}. This is known as \ac{0-RTT}. 
 
 \begin{figure}
 	\centering
@@ -45,7 +45,7 @@ With \ac{TCP}+\ac{TLS}, a round trip is needed to establish the \ac{TCP} connect
 \label{subsec:security-and-privacy}
 Another downside to \ac{TLS} and \ac{TCP} is that they leave header information exposed to middleboxes. In fact, none of \ac{TCP}'s header components is encrypted. This exposure contributes to a larger attack surface area for malicious actors but also contributes to network ossification. Middleboxes can enforce outdated \ac{TCP} behaviors and hinder protocol evolution by overwriting visible values or by expecting specific field contents and dropping packets that don't adhear to them. In contrast, QUIC encrypts a substantial portion of its header fields, including the packet number, key phase, and reserved bits, making it far less susceptible to such issues. Even fields not fully encrypted, like the Connection ID, are integrity-protected. This design allows for immediate detection of packet tampering and severely impedes a \ac{MITM} attacker from altering values. While \ac{TCP} and \ac{TLS} technically also provide integrity protection by means of the checksum field, the checksum is a simple 1's complement sum, which is feasible for an attacker to recompute.
 
-To further combat ossification, QUIC also employs a technique known as greasing. One instance of such usage is with the 'QUIC Bit', which is the second most significant bit of the first byte in every QUIC packet. While this bit is typically fixed and is used to aid in protocol identification, QUIC endpoints may negotiate using the grease\_quic\_bit transport parameter to send an arbitrary value instead~\cite{rfc9287}. This consequently encourages middleboxes to tolerate unknown or future extensions rather than relying on a static value.
+To further combat ossification, QUIC also employs a technique known as greasing. One instance of such usage is with the 'QUIC Bit', which is the second most significant bit of the first byte in every QUIC packet. While this bit is typically fixed and is used to aid in protocol identification, QUIC endpoints may negotiate using the \texttt{grease\_quic\_bit} transport parameter to send an arbitrary value instead~\cite{rfc9287}. This consequently encourages middleboxes to tolerate unknown or future extensions rather than relying on a static value.
 
 \subsection{Connection Migration}
 \label{subsec:connection-migration}
@@ -108,7 +108,7 @@ Because of the simple nature of \ac{BPF}'s calling convention, it can map direct
 
 \subsection{Helper Functions}
 \label{subsec:helper-functions}
-Depending on the hook point, a given \ac{eBPF} program will have access to a number helper functions, which provide assistance in retrieving and pushing data to the kernel. Using the registers defined in Table~\ref{tab:ebpf_registers}, a typical helper function signature will take a form similar to \texttt{u64 fn(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)}. To ensure a stable and architecture-agnostic interface, the kernel then abstracts helper functions using the macros \texttt{BPF\_CALL\_0} to \texttt{BPF\_CALL\_5}. These macros precisely define how arguments are passed from the eBPF virtual machine's registers to the kernel helper function, allowing the JIT compiler to issue direct call instructions across various CPU architectures.
+Depending on the hook point, a given \ac{eBPF} program will have access to a number of helper functions, which provide assistance in retrieving and pushing data to the kernel. Using the registers defined in Table~\ref{tab:ebpf_registers}, a typical helper function signature will take a form similar to \texttt{u64 fn(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)}. To ensure a stable and architecture-agnostic interface, the kernel then abstracts helper functions using the macros \texttt{BPF\_CALL\_0} to \texttt{BPF\_CALL\_5}. These macros precisely define how arguments are passed from the eBPF virtual machine's registers to the kernel helper function, allowing the JIT compiler to issue direct call instructions across various CPU architectures.
 
 \subsection{Maps}
 \label{subsec:ebpf-maps}
@@ -198,7 +198,7 @@ struct xdp_md {
 
 \subsubsection{sk\_buff}
 \label{subsec:sk-buff}
-The \texttt{sk\_buff} struct, which stands for socket buffer, and whose definition can be seen in Listing~\ref{lst:sk-buff}, is the central data structure representing a network packet as it traverses through the Linux network stack. The \texttt{XDP\_SKB} hook as seen in Figure~\ref{fig:xdp-receive-path} is invoked after such an \texttt{sk\_buff} has been created and thus replaces the \texttt{xdp\_md} struct for an \texttt{sk\_buff}. Created by the \ac{NIC} driver, the \texttt{sk\_buff} encapsulates the raw packet data and associated metadata such as pointers to the different protocol headers, the network interface on which the packet arrived, flags, and the length of the packet. It is used by every networking layer from the driver through to IP routing, firewalling, transport layers, and the user-space application's socket. It is designed to offer efficient in-kernel manipulation for operations like adding and stripping headers, and splitting and merging packets.
+The \texttt{sk\_buff} struct, which stands for socket buffer, and whose definition can be seen in Listing~\ref{lst:sk-buff}, is the central data structure representing a network packet as it traverses through the Linux network stack. The \texttt{XDP\_SKB} hook as seen in Figure~\ref{fig:xdp-receive-path} is invoked after such an \texttt{sk\_buff} has been created and thus replaces the \texttt{xdp\_md} struct for an \texttt{sk\_buff}. Created by the \ac{NIC} driver, the \texttt{sk\_buff} encapsulates the raw packet data and associated metadata such as pointers to the different protocol headers, the network interface on which the packet arrived, flags, and the length of the packet. It is used by every networking layer from the driver through to IP routing, firewalling, transport layers, and the userspace application's socket. It is designed to offer efficient in-kernel manipulation for operations like adding and stripping headers, and splitting and merging packets.
 
 \begin{lstlisting}[caption={The sk\_buff struct}, label={lst:sk-buff}]
 type block struct {
@@ -232,7 +232,7 @@ Once an \ac{eBPF} program has finished running within the XDP hook, it must retu
         XDP Action & Description \\
         \midrule
         \texttt{XDP\_PASS} & Allows the packet to continue its journey through the normal network stack for further processing. \\
-        \texttt{XDP\_DROP} & Immediately drops the packet at the earliest possible point, preventing it from consuming further kernel resources. \\
+        \texttt{XDP\_DROP} & Immediately drops the packet at the earliest possible point, preventing it from consuming further resources. \\
         \texttt{XDP\_ABORTED} & Indicates an error or that an exception occurred within the XDP program, leading to the packet being dropped. This is similar to \texttt{XDP\_DROP} but signals a problem. \\
         \texttt{XDP\_TX} & Transmits the packet back out of the same network interface it arrived on. This is often used for fast replies or packet reflection. \\
         \texttt{XDP\_REDIRECT} & Redirects the packet to a different network interface or to an \texttt{AF\_XDP} socket in userspace. This enables fast packet steering. \\
@@ -256,9 +256,9 @@ Second, the total number of chunks must be determined. If this number is too sma
 
 Once this entire setup is complete, the result is effectively a large, contiguous block of memory that functions very much like an array, ready to receive packets.
 
-Once the UMEM region is configured, the application must establish a communication channel between the kernel (i.e., the \ac{eBPF} program) and userspace. This is achieved using ring buffers, which are fixed-size, pre-allocated circular buffers. Their circular nature means that once full, new data overwrites the oldest existing data, rather than requiring reallocation or copying. Ring buffers are frequently employed in single-producer, single-consumer contexts to enable lockless operations. Consequently, it is imperative that the consumer's processing speed surpasses the producer's rate to avoid data overwrites and potential loss.
+Once the UMEM region is configured, the application establishes a communication channel with the kernel (specifically, the \ac{eBPF} program) using fixed-size, pre-allocated circular ring buffers. This design choice enables highly efficient lockless operations in a single-producer, single-consumer model, as it avoids further memory allocation. However, a direct consequence of this fixed capacity is that when a ring becomes full, new packets are dropped. To therefore ensure data integrity and avoid packet loss, the consumer's processing speed must consistently surpass the producer's rate.
 
-Immediately after allocating the UMEM region, the userspace process contains ownership over all the chunks. This is represented in Figure~\ref{fig:umem-after-initialization}. 
+At this point, the userspace process contains ownership over all the chunks. This is represented in Figure~\ref{fig:umem-after-initialization}. 
 
 \begin{figure}
 	\centering
@@ -294,7 +294,7 @@ Once the packets have been copied into the UMEM chunks controlled by the kernel,
 	\label{fig:add-descs-to-fill-queue}
 \end{figure}
 
-Once the kernel has consumed a descriptor from the RX queue, the userspace application updates the \texttt{RX queue}'s tail pointer and gains two options for handling the associated frame. First, it can return the descriptor to the \texttt{Fill queue}, effectively relinquishing control of the frame back to the kernel for future incoming packets. Alternatively, the application can populate the frame with its own data and add the descriptor to the \texttt{TX queue}. In this scenario, control passes to the kernel with the explicit intent of transmitting the packet out onto the network interface (as depicted in Figure~\ref{fig:add-desc-to-tx-queue}). Upon successful transmission, the kernel consumes the TX descriptor and signals completion by adding a new descriptor to the \texttt{Completion queue}.
+Once the application has consumed a descriptor from the RX queue, it updates the \texttt{RX queue}'s tail pointer and gains two options for handling the associated frame. First, it can return the descriptor to the \texttt{Fill queue}, effectively relinquishing control of the frame back to the kernel for future incoming packets. Alternatively, the application can populate the frame with its own data and add the descriptor to the \texttt{TX queue}. In this scenario, control passes to the kernel with the explicit intent of transmitting the packet out onto the network interface (as depicted in Figure~\ref{fig:add-desc-to-tx-queue}). Upon successful transmission, the kernel consumes the TX descriptor and signals completion by adding a new descriptor to the \texttt{Completion queue}.
 
 \begin{figure}
 	\centering
@@ -309,11 +309,11 @@ Throughout the lifetime of the process, this interplay of constantly consuming a
 \label{subsec:xdp-options}
 Despite AF\_XDP being a relatively new technology, there are a number of available features to change and enhance the way it functions.
 
-\subsubsection{Zero Copy}
+\subsubsection{Zero-Copy}
 \label{subsec:zero-copy}
 By default, when a packet arrives at the \ac{NIC}, the traditional kernel receive path involves copying the incoming data into a buffer within the RX ring, as depicted in Figure~\ref{fig:xdp-receive-path}. When AF\_XDP is active without specific optimizations, the network driver then has to perform a second copy, moving this packet data from the kernel's buffer into a UMEM frame. This double-copy operation introduces noticeable overhead, consuming both CPU cycles and memory bandwidth.
 
-However, this costly double-copy can be entirely bypassed by enabling zero-copy mode. This is achieved by passing the \texttt{XDP\_ZEROCOPY} flag to the \texttt{bind(2)} syscall when an \ac{XSK} binds with a queue on the NIC. With zero-copy enabled, the \ac{NIC} is instructed to directly place the incoming Layer 2 packet into a UMEM frame. This means the packet data never needs to be copied into an intermediate kernel buffer, resulting in significantly reduced latency, lower CPU utilization, and higher packet throughput. It is important to note however, that the success of zero-copy depends on the network driver's support and the NIC's capabilities, as it requires direct interaction between the hardware and the UMEM region.
+However, this costly double-copy can be entirely bypassed by enabling zero-copy mode. This is achieved by passing the \texttt{XDP\_ZEROCOPY} flag to the \texttt{bind(2)} syscall when an \ac{XSK} binds with a queue on the NIC. With zero-copy enabled, the \ac{NIC} is instructed to directly place the incoming Layer 2 packet into a UMEM frame. This means the packet data never needs to be copied into an intermediate kernel buffer, resulting in what should be significantly reduced latency, lower CPU utilization, and higher packet throughput. It is important to note however, that the success of zero-copy depends on the network driver's support and the NIC's capabilities, as it requires direct interaction between the hardware and the UMEM region.
 
 \subsubsection{XDP Hardware Offload}
 \label{subsec:xdp-hardware-offload}
@@ -321,22 +321,22 @@ In the effort to minimize load on the CPU, it has now also become possible to of
 
 \section{Precision Time Protocol}
 \label{sec:ptp}
-Throughout history, humans have continuously refined methods of timekeeping to enable synchronization among multiple entities. From sundials to pendulum clocks, the need for precise time has spurred ever-finer-grained models. \ac{PTP}, defined by the \ac{IEEE} as \ac{IEEE}-1588, is a protocol to synchronize clocks in a computer network~\cite{IEEE1588_2019_PTP} and represents the next step in this evolution. Several versions exist, each of which supersedes the previous version: PTPv1 (\ac{IEEE} 1588-2002), PTPv2 (\ac{IEEE} 1588-2008), and PTPv2.1 (\ac{IEEE} 1588-2019). \ac{PTP} is accurate to the sub-microsecond, can function over Ethernet or IP, and is already widely deployed in industry ~\cite{MetaPTP2022}.
+Throughout history, humans have continuously refined methods of timekeeping to enable synchronization among multiple entities. From sundials to pendulum clocks, the need for precise time has spurred ever-finer-grained models. \ac{PTP}, defined by the \ac{IEEE} as \ac{IEEE}-1588, is a protocol to synchronize clocks in a computer network~\cite{IEEE1588_2019_PTP} and represents the latest step in this evolution. Several versions exist, each of which supersedes the previous version: PTPv1 (\ac{IEEE} 1588-2002), PTPv2 (\ac{IEEE} 1588-2008), and PTPv2.1 (\ac{IEEE} 1588-2019). \ac{PTP} is accurate to the sub-microsecond, can function over Ethernet or IP, and is already widely deployed in industry ~\cite{MetaPTP2022}.
 
 Setting up a \ac{PTP} network involves a clear sequence of steps. Initially, each node within the network must be configured. Thereafter, the Best Master Clock Algorithm, as detailed in Subsection~\ref{subsec:best-master-clock-algorithm}, is executed to determine the optimal master clock. The final step is for all nodes to synchronize their clocks, a process elaborated upon in Subsection~\ref{subsec:synchronization}. It is imperative for a successful synchronization that the nodes align their clock \emph{frequencies}, \emph{phases}, and \emph{times}.
 
 \subsection{PTP Profiles}
 \label{subsec:ptp-profiles}
-The PTPv2.1 (\ac{IEEE} 1588-2019) standard includes various \emph{profiles} that adapt the core \ac{PTP} protocol to meet the specific requirements of different industries. The \ac{PTP} topology developed for this thesis utilizes the \ac{IEEE} 802.1AS profile~\cite{4659212}, commonly known as \emph{\ac{gPTP}}. This profile is primarily used in Ethernet local area networks for applications such as audio and video, and falls under the \ac{TSN} umbrella. A key advantage of \ac{gPTP} is its operation directly at Ethernet Layer 2, which reduces overhead compared to other profiles that function at Layer 3.
+The PTPv2.1 (\ac{IEEE} 1588-2019) standard includes various \emph{profiles} that adapt the core \ac{PTP} protocol to meet the specific requirements of different industries. The \ac{PTP} topology developed for this thesis utilizes the \ac{IEEE} 802.1AS profile~\cite{4659212}, commonly known as \emph{\ac{gPTP}}. It is primarily used in Ethernet local area networks for applications such as audio and video, and falls under the \ac{TSN} umbrella. A key advantage of \ac{gPTP} is its operation directly at Ethernet Layer 2, which reduces overhead compared to other profiles that function at Layer 3.
 
 \subsection{PTP Tools}
 \label{subsec:ptp-tools}
-Within Linux, three primary tools are used to carry out the clock synchronization in \ac{PTP}: \texttt{ptp4l}, \texttt{phc2sys}, and \texttt{pmc}. These tools are all part of the \emph{linuxptp} project, which is an open-source implementation of the \ac{PTP} specification~\cite{LinuxPTP}. \texttt{ptp4l} is a daemon that synchronizes the \ac{PHC} of the \ac{NIC} to match the time of a \ac{PTP} master clock. It accomplishes this by exchanging \ac{PTP} messages (i.e. Sync, Follow\_Up, Delay\_Req, Delay\_Resp) with the master clock as further described in Subsection~\ref{subsec:synchronization}. These messages allow \texttt{ptp4l} to calculate the offset, delay, and drift between the slave and master \ac{PHC}s, all of which are necessary to maintain high accuracy. \texttt{phc2sys} is a daemon that disciplines the \texttt{CLOCK\_REALTIME} (i.e. the system clock) or \ac{PHC}s with a chosen \ac{PHC}. This is desirable for a few reasons. First, \texttt{phc2sys} allows the system times of two different computers to be synced with each other, which is crucial for scenarios demanding high temporal accuracy like data logging or event correlation. Second, using \texttt{phc2sys} to sync multiple \ac{PHC}s is advantageous when network topology constraints prevent them from being connected through traditional \ac{PTP} means. An example of such a topology can be seen in Figure~\ref{fig:ptp-topology}. Finally, \texttt{pmc} is a tool used to configure \texttt{ptp4l} during run-time.
+Within Linux, three primary tools are used to carry out the clock synchronization in \ac{PTP}: \texttt{ptp4l}, \texttt{phc2sys}, and \texttt{pmc}. These tools are all part of the \emph{linuxptp} project, which is an open-source implementation of the \ac{PTP} specification~\cite{LinuxPTP}. \texttt{ptp4l} is a daemon that synchronizes the \ac{PHC} of the \ac{NIC} to match the time of a \ac{PTP} master clock. It accomplishes this by exchanging \ac{PTP} messages (i.e. Sync, Follow\_Up, Delay\_Req, Delay\_Resp) with the master clock as further described in Subsection~\ref{subsec:synchronization}. These messages allow \texttt{ptp4l} to calculate the offset, delay, and drift between the slave and master \ac{PHC}s, all of which are necessary to maintain high accuracy and precision. \texttt{phc2sys} is a daemon that disciplines the \texttt{CLOCK\_REALTIME} (i.e. the system clock) or \ac{PHC}s with a 'master' \ac{PHC}. This is desirable for a few reasons. First, \texttt{phc2sys} allows the system times of two different computers to be synced with each other, which is crucial for scenarios demanding high temporal accuracy like data logging or event correlation. Second, using \texttt{phc2sys} to sync multiple \ac{PHC}s is advantageous when network topology constraints prevent them from being connected through traditional \ac{PTP} means. An example of such a topology can be seen in Figure~\ref{fig:ptp-topology}. Finally, \texttt{pmc} is a tool used to configure \texttt{ptp4l} during run-time.
 
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/ptp-topology2}
-    \caption[A PTP Topology showing phc2sys usage for system time and PHC discipline.]{A PTP Topology showing \texttt{phc2sys} usage. \texttt{eno6} on the sniffer disciplines the system time and the \ac{PHC}s corresponding to \texttt{eno8} and \texttt{eno7}. \texttt{eno6} on the client also disciplines the system time using \texttt{phc2sys}. Synchronizing \texttt{eno7}'s \ac{PHC} on the sniffer with \texttt{eno6}'s \ac{PHC} necessitates an additional port and interface on \texttt{eno7}'s \ac{NIC}. This auxiliary port would establish a \ac{PTP} link to an extra port on \texttt{eno6}'s \ac{NIC}, which would allow \texttt{eno7} to continue capturing traffic while the auxiliary interface disciplines the shared \ac{PHC} via its slave-master relationship with \texttt{eno6}. The same principle applies to \texttt{eno8}.}
+    \caption[A PTP Topology showing phc2sys usage for system time and PHC discipline.]{A PTP Topology showing \texttt{phc2sys} usage. \texttt{eno6} on the sniffer disciplines the system time and the \ac{PHC}s corresponding to \texttt{eno8} and \texttt{eno7}. \texttt{eno6} on the client also disciplines the system time using \texttt{phc2sys}. Hypothetically speaking, synchronizing \texttt{eno7}'s \ac{PHC} on the sniffer with \texttt{eno6}'s \ac{PHC} would necessitate a direct link (i.e. additional ports and interfaces) between \texttt{eno7}'s and \texttt{eno6}'s \ac{NIC}s. This would allow one port on \texttt{eno7}'s \ac{NIC} to continue capturing traffic while the other port is used to discipline the shared hardware clock. The same principle applies to \texttt{eno8}.}
 	\label{fig:ptp-topology}
 \end{figure}
 
@@ -350,7 +350,7 @@ As already alluded to, the concept of "time" itself can be defined and represent
 
 \subsubsection{International Atomic Time (TAI)}
 \label{subsubsec:tai}
-\ac{TAI} is an atomic timescale that shares the reference point of January 1st, 1970 with \ac{UTC}; however, it differs in that it is bound to the atomic scale (e.g. measuring the vibrations of atoms like cesium-133) as opposed to Earth's rotation. This is beneficial as the behavior of certain atoms are much more precise, which results in an extremely robust monotonically increasing clock. Converting \ac{TAI} to \ac{UTC} requires knowing how many leap seconds have occurred since the reference point in 1970. As of July 2025, there have been 37 leap seconds, which means $UTC = TAI - 37$. The benefit is that data centers using synchronized hardware working in \ac{TAI} are still able to store timestamps in \ac{UTC} for clients to consume.
+\ac{TAI} is an atomic timescale that shares the reference point of January 1st, 1970 with \ac{UTC}; however, it differs in that it is bound to the atomic scale (e.g. measuring the vibrations of atoms like Caesium-133) as opposed to Earth's rotation. This is beneficial as the behavior of certain atoms are much more precise, which results in an extremely robust monotonically increasing clock. Converting \ac{TAI} to \ac{UTC} requires knowing how many leap seconds have occurred since the reference point in 1970. As of July 2025, there have been 37 leap seconds, which means $UTC = TAI - 37$. The benefit is that data centers using synchronized hardware working in \ac{TAI} are still able to store timestamps in \ac{UTC} for clients to consume.
 
 \subsubsection{CLOCK\_REALTIME}
 \label{subsubsec:clock-realtime}
@@ -364,7 +364,7 @@ Beyond approximating \ac{UTC}, the internal oscillator also maintains a predicta
 \label{subsec:nic-hw-clocks}
 Besides the oscillator found on the computer's motherboard, some \ac{NIC}s are equipped with their own internal oscillators for timekeeping, as illustrated in Figure~\ref{fig:ptp-timestamping-options}. These \ac{PHC}s are crucial for achieving extremely accurate timestamping because they are inherently immune to the scheduling delays that can arise with software timestamps in Linux.
 
-To verify whether a \ac{NIC} supports hardware timestamping, the \texttt{ethtool -T <interface\_name>} command can be used. A strong indication of hardware timestamping capability, and therefore suitability for \ac{PTP}, is the presence of \emph{hardware-receive}, \emph{hardware-transmit}, and \texttt{PTP Hardware Clock: <num>} in the command's output.
+To verify whether a \ac{NIC} supports hardware timestamping, the \texttt{ethtool -T} command can be used. A strong indication of hardware timestamping capability, and therefore suitability for \ac{PTP}, is the presence of \emph{hardware-receive}, \emph{hardware-transmit}, and \emph{PTP Hardware Clock: <num>} in the command's output.
 
 As a word of caution, it is important to note that some \ac{NIC}s may only offer hardware timestamps up to a certain bit rate or packet rate. Therefore, referencing the \ac{NIC} documentation is essential to determine these specific limitations.
 
@@ -429,7 +429,7 @@ Each Announce message carries the properties of the transmitting node's \ac{PHC}
         \texttt{clockAccuracy} & An encoded value representing the clock accuracy to the "true" time. Lower values indicate higher accuracy. \\
         \texttt{offsetScaledLogVariance} & An encoded value representing the clock's variance. Lower values indicate greater stability. \\
         \texttt{priority2} & A secondary priority value (0-255), used as a tie-breaker if the listed attributes above are equal. Lower values indicate higher preference. \\
-        \texttt{clockIdentity} & The clock's unique 64-bit identifier, usually based on its MAC address. Used as the final tie-breaker in the \ac{BMCA}. \\
+        \texttt{clockIdentity} & The clock's unique 64-bit identifier. Used as the final tie-breaker in the \ac{BMCA}. \\
         \bottomrule
     \end{tabular}
     \caption{Key Attributes for \ac{PTP} \ac{BMCA}}
@@ -442,7 +442,7 @@ Once the \ac{PTP} topology is established, the \ac{PHC}s begin their synchroniza
 
 Figure~\ref{fig:ptp-frequency-synchronization} depicts the message sequence for a slave to achieve frequency synchronization with its master. The master initiates this by dispatching two \texttt{Sync} messages and recording their egress timestamps, $t_{m}^{1} \text{ and } t_{m}^{2}$, at the moment they exit the \ac{NIC}. These timestamps are subsequently transmitted to the slave in individual \texttt{Follow\_Up} messages. In parallel, the slave generates ingress timestamps, $t_{s}^{1} \text{ and } t_{s}^{2}$, upon the \texttt{Sync} messages' arrival at its \ac{NIC}'s port. Now equipped with these four timestamp values, the slave possesses enough information to compute its clock drift relative to the master.
 
-The calculation proceeds by first determining the time intervals on both the master and slave sides: $\Delta_{m}=t_{m}^{2}-t_{m}^{1}$ and $\Delta_{s}=t_{s}^{2}-t_{s}^{1}$. Thereafter, the slave's relative frequency drift is computed as $\text{Drift}=\frac{\Delta_{2}-\Delta_{1}}{\Delta{2}}$. If this drift value is positive, it signifies the slave's clock is advancing faster than the master's, thus requiring a reduction in speed. Conversely, a negative drift value indicates the slave's clock is lagging, necessitating an increase in speed.
+The calculation proceeds by first determining the time intervals on both the master and slave sides: $\Delta_{m}=t_{m}^{2}-t_{m}^{1}$ and $\Delta_{s}=t_{s}^{2}-t_{s}^{1}$. Thereafter, the slave's relative frequency drift is computed as $\text{Drift}=\frac{\Delta_{s}-\Delta_{m}}{\Delta{s}}$. If this drift value is positive, it signifies the slave's clock is advancing faster than the master's, thus requiring a reduction in speed. Conversely, a negative drift value indicates the slave's clock is lagging, necessitating an increase in speed.
 
 With the frequency synchronized, the slave clock proceeds to synchronize its phase and time-of-day. This is achieved by precisely calculating the propagation delay and the clock offset. The propagation delay represents the time a packet takes to traverse the physical medium from master to slave. The offset is the necessary adjustment to the slave's clock to align it with the master's, after accounting for this propagation delay.
 
@@ -470,7 +470,7 @@ Finally, it's important to note that Figure~\ref{fig:ptp-synchronization} depict
 
 \section{MsQuic}
 \label{sec:msquic}
-MsQuic\footnote{https://github.com/microsoft/msquic}, Microsoft's QUIC implementation, was selected for the measurements in this thesis due to its high-throughput performance, as demonstrated in \textbf{[TODO: CITE HIGH-THROUGHPUT REFERENCE]}~\cite{}. Furthermore, it is one of the few QUIC implementations that supports \ac{XDP}. Developed for Windows, Linux, FreeBSD, and macOS, MsQuic employs a two-layered architecture to achieve cross-platform scalability: the QUIC layer and the \ac{PAL}.
+MsQuic\footnote{https://github.com/microsoft/msquic}, Microsoft's QUIC implementation, was selected for the measurements in this thesis due to its high-throughput performance, as demonstrated in Kempf et al.~\cite{kempf2024quicperf}. Furthermore, it is one of the few QUIC implementations that supports \ac{XDP}. Developed for Windows, Linux, FreeBSD, and macOS, MsQuic employs a two-layered architecture to achieve cross-platform scalability: the QUIC layer and the \ac{PAL}.
 
 The QUIC layer encapsulates the core QUIC protocol logic and generally remains consistent across different builds. In contrast, the \ac{PAL} provides abstractions for critical components such as \ac{TLS}, \ac{UDP}, and operating system primitives like threads and locks~\cite{MsQuicArchitecture}. While this architecture introduces some complexity, it offers the significant advantage of modularity, enabling "plug-and-play" functionality for various components. For instance, users can choose from three \ac{TLS} variants: OpenSSL1.1\footnote{https://openssl-library.org/news/openssl-1.1.1-notes/index.html}, OpenSSL3\footnote{https://openssl-library.org/news/openssl-3.0-notes/index.html}, and Schannel\footnote{https://learn.microsoft.com/en-us/windows/win32/com/schannel}.
 
@@ -486,9 +486,9 @@ This modular design also allows for fine-grained control over the datapath, whic
 	\label{fig:buffers}
 \end{figure}
 
-Figure~\ref{fig:recvfrom} shows how a packet flows through the kernel to reach a socket buffer, after which a system call such as \texttt{recvfrom(2)} can pull the packet's data into userspace. Upon arrival at the \ac{NIC}, the packet is directly \ac{DMA}-ed into the RX ring buffer, as depicted in Figure~\ref{fig:buffers}. This direct memory access bypasses the \ac{CPU}, significantly reducing its load. The \ac{NIC} then signals the \ac{CPU} via an interrupt request, indicating packet arrival. In response, a NAPI\footnote{https://docs.kernel.org/networking/napi.html} context is established, which subsequently polls the \ac{NIC} for further packets.
+Figure~\ref{fig:buffers} shows how a packet flows through the kernel to reach a socket buffer, after which a system call such as \texttt{recvfrom(2)} can pull the packet's data into userspace. Upon arrival at the \ac{NIC}, the packet is directly \ac{DMA}-ed into a buffer within kernel memory, and a descriptor within the RX ring is updated to indicate the buffer contains a valid packet. This is depicted in Figure~\ref{fig:recvfrom}. The \ac{NIC} then signals the \ac{CPU} via an interrupt request, indicating packet arrival. In response, a NAPI\footnote{https://docs.kernel.org/networking/napi.html} context is established, which subsequently polls the \ac{NIC} for further packets.
 
-With packets now present in the RX buffer, the \ac{NIC} driver is invoked. It creates an \texttt{sk\_buff} structure, which holds references to the packet data in the RX buffer along with essential metadata. This \texttt{sk\_buff} then traverses the various layers of the network stack, undergoing necessary processing steps, until it is ultimately enqueued into the socket's receive buffer. Finally, the \texttt{recvfrom(2)} system call is invoked, triggering a context switch that copies the packet data from the kernel buffer into the userspace application's memory.
+With the packet now present in the buffer, the \ac{NIC} driver creates an \texttt{sk\_buff} structure, which holds references to the packet data in the RX ring, along with essential metadata. This \texttt{sk\_buff} then traverses the various layers of the network stack, undergoing necessary processing steps, until it is ultimately enqueued into the socket's receive buffer. Finally, the \texttt{recvfrom(2)} system call is invoked, triggering a context switch that copies the packet data from the kernel buffer into the userspace application's memory.
 
 \begin{figure}
 	\centering
@@ -497,7 +497,7 @@ With packets now present in the RX buffer, the \ac{NIC} driver is invoked. It cr
 	\label{fig:recvfrom}
 \end{figure}
 
-\subsubsection{recvfrom(2)}
+\subsubsection{recvmmsg(2)}
 \label{subsubsec:recvfrom}
 As seen in Figure~\ref{fig:recvmmsg}, the \texttt{recvmmsg(2)} system call represents an improvement over \texttt{recvfrom(2)} by allowing an application to receive multiple messages with a single system call. It accomplishes this by providing the kernel with an array of buffers and instructs it to fill as many as possible with available packet data. Fundamentally, this enables the application to \emph{batch} several receive operations into a single system call, which amortizes the cost of the context switch.
 
@@ -519,7 +519,7 @@ One downside to the approaches above is that an \texttt{sk\_buff} is allocated f
 	\label{fig:gro}
 \end{figure}
 
-Finally, we can combine these two enhancements together as seen in Figure~\ref{gro-recvmmsg}. This results in the combination of less overhead per context switch and less processing per byte of data.
+Finally, we can combine these two enhancements together as seen in Figure~\ref{fig:gro-recvmmsg}. This results in the combination of less overhead per context switch and less processing per byte of data.
 
 \begin{figure}
 	\centering
@@ -538,7 +538,7 @@ Measurements for this thesis utilized a modified \ac{QIR} framework, as describe
 
 For each measurement, a file-download scenario between a client and server was executed, allowing for throughput inference. A dedicated management node was responsible for resetting machines to a baseline state (e.g., Debian Bookworm) and distributing necessary files and environment variables. Splitters were incorporated as non-invasive means to duplicate packets exchanged between the client and server, enabling the sniffer to capture them, which was crucial for \ac{PTP} tests.
 
-The core advantage of the \ac{QIR} framework lies in its emphasis on repeatability. It allows for the declarative specification of runtime environments, QUIC implementations, test types, and pre- and post-processing steps, all handled automatically by \ac{QIR}.
+The core advantage of the \ac{QIR} framework lies in its emphasis on repeatability. It allows for the declarative specification of runtime environments, QUIC implementations, test types, and pre- and post-processing steps, all handled automatically by the \ac{QIR}.
 
 \begin{figure}
 	\centering

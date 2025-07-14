@@ -60,6 +60,23 @@
 @STRING{usenix_fast={Conference on File and Storage Technologies (\sc{FAST})} }
 @STRING{ieee_wts= {{\sc{IEEE}} Wireless Telecommunications Symposium (\sc{WTS})} }
 
+@article{kempf2024quicperf,
+    title     = {{QUIC on the Fast Lane: Extending Performance Evaluations on High-rate Links}},
+    author    = {Kempf, Marcel and Jaeger, Benedikt and Zirngibl, Johannes and Ploch, Kevin and Carle, Georg},
+    journal   = {Computer Communications},
+    year      = 2024,
+    month     = jul,
+    volume    = {223},
+    pages     = {90-100},
+    issn      = {0140-3664},
+    publisher = {Elsevier},
+    doi       = {10.1016/j.comcom.2024.04.038},
+    url       = {https://doi.org/10.1016/j.comcom.2024.04.038},
+    homepage  = {https://github.com/tumi8/quic-10g-paper},
+    keywords  = {QUIC, performance evaluation, transport protocols},
+    abstract  = {QUIC is a new protocol standardized in 2021 designed to improve on the widely used TCP/TLS stack. The main goal is to speed up web traffic via HTTP, but it is also used in other areas like tunneling. Based on UDP, it offers features like reliable in-order delivery, flow and congestion control, stream-based multiplexing, and always-on encryption using TLS 1.3. Unlike TCP, QUIC integrates these capabilities in user space, relying on kernel interaction solely for UDP. Operating in user space allows more flexibility but sacrifices some kernel-level efficiency and optimization that TCP benefits from. Various QUIC implementations exist, each distinct in programming language, architecture, and design. QUIC is already widely deployed on the Internet and has been evaluated, focussing on low latency, interoperability, and standard compliance. However, benchmarks on high-speed network links are still scarce. This paper presents an extension to the QUIC Interop Runner, a framework for testing the interoperability of QUIC implementations. Our contribution enables reproducible QUIC benchmarks on dedicated hardware and high-speed links. We provide results on 10G links, including multiple implementations, evaluate how OS features like buffer sizes and NIC offloading impact QUIC performance, and show which data rates can be achieved with QUIC compared to TCP. Moreover, we analyze different CPUs and CPU architectures influence reproducible and comparable performance measurements. Furthermore, our framework can be applied to evaluate the effects of future improvements to the protocol or the OS. Our results show that QUIC performance varies widely between client and server implementations from around 50Mbit/s to over 6000Mbit/s. We show that the OS generally sets the default buffer size too small. Based on our findings, the buffer size should be increased by at least an order of magnitude. Our profiling analysis identifies Packet I/O as the most expensive task for QUIC implementations. Furthermore, QUIC benefits less from AES NI hardware acceleration while both features improve the goodput of TCP to around 8000Mbit/s. The lack of support for NIC offloading from QUIC implementations results in missed opportunities for performance improvement. The assessment of CPUs from different vendors and generations revealed significant performance variations. We employed core pinning to examine if the performance of QUIC implementations is affected by the allocation to specific CPU cores. The results indicated an increased goodput of up to 20% when running on a specifically chosen core compared to a randomly assigned core. This outcome highlights the impact of CPU core selection on the performance of QUIC implementations but also for reproducible measurements.}
+}
+
 @misc{xdp_multibuff_2019,
   author = {Lorenzo Bianconi and Eelco Chaudron and Jesper Dangaard Brouer and Toke H{\o}iland-J{\o}rgensen},
   title = {Bringing TSO/GRO and Jumbo
