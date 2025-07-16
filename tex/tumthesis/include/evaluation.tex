@@ -1,11 +1,42 @@
 \chapter{Evaluation}
 \label{chap:evaluation}
 
+As described in Chapter~\ref{chap:implementation}, we took our modifications to the \ac{QIR} and performed various measurements. In Section~\ref{sec:rx-batch-sizes}, we evaluate the effect of different batch sizes for the AF\_XDP RX ring buffer. In Section~\ref{sec:xdp-modes}, we analyze the impact on goodput from using the \ac{XDP} modes XDP\_SKB, XDP\_DRV with no zero-copy, and XDP\_DRV with zero-copy when present in the client or in the server. In Section~\ref{sec:nic-to-userspace}, we analyze the time it took for a packet to go from the \ac{NIC} into userspace from the standard Linux datapath and AF\_XDP. Finally, in Section~\ref{sec:taxonomy}, we create a taxonomy comparing different approaches to reducing packet I/O within the context of QUIC.
+
+For all but the \ac{PTP} measurements, we ran 20 iterations of an 8 Gigabyte file download. For the \ac{PTP} measurements, we ran 1 iteration of a 128 Megabyte file download but given that our granularity was at the packet level, we were able to sample tens of thousands of packets in one measurement.
+
+Lastly, in all but the \ac{PTP} measurement, the whiskers represent one standard deviation from the mean. For the \ac{PTP} measurement, the whiskers represent the minimum and maximum values, excluding outliers.
+
+\section{RX Batch Sizes}
+\label{sec:rx-batch-sizes}
+As described in Subsection~\ref{subsec:variation-of-batch-sizes}, the variation of batch sizes for the RX ring buffer can have an influence on the performance of a QUIC implementation. Seen in Figure~\ref{fig:xdp-batch-size}, we can see how how the the total achieved throughput increases for every multiple of 2 until an RX batch size of 32, at which point it stagnates.
+
+One potential explanation for this behavior is that at a batch size of 32, this feature no longer becomes the biggest bottleneck in the application. Given that MsQuic must do work on each packet after it has fetched them (e.g. decrypting the payload, or stripping and parsing the headers), with a big enough batch size, it will always have enough packets at hand to saturate the CPU completely without having to wait for any more packets.
+
+Another potential explanation is with the \texttt{NAPI\_POLL\_WEIGHT}\footnote{https://elixir.bootlin.com/linux/v6.1/source/include/linux/netdevice.h\#L2547}. As mentioned in Chapter~\ref{chap:background}, a NAPI\_CONTEXT is created after a packet is \ac{DMA}ed into kernel memory and a corresponding hardware interrupt is generated. The NAPI\_CONTEXT then becomes responsible for polling the \ac{NIC} for new packets rather than waiting for interrupts, which eliminates the risk of an interrupt storm from occurring. Although technically overwriteable by drivers, \texttt{NAPI\_POLL\_WEIGHT} is set to a default value of 64, meaning that each poll may process 64 descriptors at one time. It is therefore possible that at a certain RX batch size, the MsQuic application can consume packets at a higher rate than the NAPI\_CONTEXT can fetch them.
+
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/dogecoin-batch-size.pdf}
-	\caption[Throughput vs RX Batch Size on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput on Dogecoin using different RX batch sizes on the AF\_XDP client.}
+	\caption[Throughput vs RX Batch Size on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput with \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs and \emph{Intel X552 10 GbE SFP+} NICs using different RX batch sizes on the AF\_XDP client.}
 	\label{fig:xdp-batch-size}
+\end{figure}
+
+\section{XDP Modes}
+\label{sec:xdp-modes}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.75\linewidth]{pics/dogecoin-client-throughput.pdf}
+	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput on Dogecoin using different XDP Modes on the AF\_XDP client.}
+	\label{fig:dogecoin-client-throughput}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.75\linewidth]{pics/opulous-client-throughput.pdf}
+	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5} Driver.]{A Comparison of the total achieved throughput on Opulous using different XDP Modes on the AF\_XDP client.}
+	\label{fig:opulous-client-throughput}
 \end{figure}
 
 \begin{figure}
@@ -24,17 +55,29 @@
 
 \begin{figure}
 	\centering
-	\includegraphics[width=.75\linewidth]{pics/opulous-client-throughput.pdf}
-	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5} Driver.]{A Comparison of the total achieved throughput on Opulous using different XDP Modes on the AF\_XDP client.}
-	\label{fig:opulous-client-throughput}
+	\includegraphics[width=.75\linewidth]{pics/pidstat-stacked-plot.pdf}
+	\caption[User and System CPU Usage vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total user and system CPU usage on Dogecoin using different XDP Modes on the AF\_XDP server.}
+	\label{fig:pidstat-stacked-plot}
 \end{figure}
 
 \begin{figure}
 	\centering
-	\includegraphics[width=.75\linewidth]{pics/dogecoin-client-throughput.pdf}
-	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput on Dogecoin using different XDP Modes on the AF\_XDP client.}
-	\label{fig:dogecoin-client-throughput}
+	\includegraphics[width=.99\linewidth]{pics/flame-drv-zc-server.png}
+	\caption[Flamegraph.]{lorem ipsum.}
+	\label{fig:flame-drv-zc-server}
 \end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.99\linewidth]{pics/flame-skb-server.png}
+	\caption[Flamegraph.]{lorem ipsum.}
+	\label{fig:flame-skb-server}
+\end{figure}
+
+The skb and drv-no-zc are spending their time on iommu\_dma\_map\_page, sock\_alloc\_send\_pskb, and sock\_def\_write\_space. The drv-zc is not doing that at all.
+
+\subsection{NIC to Userspace Traversal time with PTP}
+\label{sec:nic-to-userspace}
 
 \begin{figure}
 	\centering
@@ -43,3 +86,14 @@
 	\label{fig:network-stack-diff}
 \end{figure}
 
+\section{Taxonomy}
+\label{sec:taxonomy}
+
+- Lxin-quic
+- DPDK
+- XDP
+
+
+
+
+QUIC optimizations, organizing each based on implementation complexity, performance improvement potential, unwanted side effects, flexibility, privilege level usage, and dynamic vs. static loading.
