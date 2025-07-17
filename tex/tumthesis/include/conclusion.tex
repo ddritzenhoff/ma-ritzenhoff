@@ -2,27 +2,39 @@
 \label{chap:conclusion}
 In this chapter, we conclude our work. We begin by answering our research questions, then summarize our findings and outline future work.
 
-\textbf{TODO}: go over research questions.
+\textbf{To what extent can we increase QUIC performance by using XDP in a trivial way? Is there optimization potential?} Our evaluation in Chapter~\ref{chap:evaluation} reveals that AF\_XDP, in its current implementation, underperforms the default network datapath in goodput for both receive and send-dominanted scenarios. Furthermore, AF\_XDP does not offer a statistically significant reduction in the network stack traversal time from the NIC to userspace.
+
+Despite this, however, our analysis highlighted significant performance variations among the different XDP modes: XDP\_DRV without zero-copy, XDP\_DRV with zero-copy, and XDP\_SKB. Specifically, within the server's AF\_XDP sending datapath, we demonstrated how the additional memory copy from the UMEM frame into kernel memory, inherent in XDP\_DRV without zero-copy and XDP\_SKB, drastically reduces goodput.
+
+Finally, as detailed in Subsection~\ref{subsec:performance-improvements}, further optimizations to the AF\_XDP datapath are possible, which could make it more competitive against its alternatives.
+
+\textbf{Can a taxonomy be created for QUIC optimizations, categorizing them by implementation complexity, performance improvement potential, unwanted side effects, flexibility, privilege level usage, and dynamic vs. static loading?}
+
+\textbf{TODO}
 
 \subsection{Performance Improvements}
-\label{performance-improvements}
+\label{subsec:performance-improvements}
 Throughout the research for this thesis, we identified several promising ideas for future investigation. The following sections dive into some of these ideas.
 
 \subsubsection{Enabling GRO within XDP}
 \label{subsubsec:enabling-gro-within-xdp}
-The performance benefits of GRO, stemming from reduced per-packet overhead within the Linux network stack, can be similarly extended to XDP. Figure~\ref{fig:gro-offload-with-xdp} demonstrates that the \texttt{XDP\_SKB} hook's invocation after \ac{GRO} processing makes it a suitable point to reuse existing \ac{GRO} logic. This stands in contrast with \texttt{XDP\_DRV}, which would necessitate moving the \ac{GRO} logic directly into the driver. With respect to enabling this change, according to Bianconi et al.~\cite{xdp_multibuff_2019}, initial work towards this integration is already in progress. A key enabler for this progress is the increasing support for XDP Fragments~\cite{af_xdp_driver_support} across various drivers.
+The performance advantages of \ac{GRO}, primarily its reduction of per-packet overhead within the Linux network stack (as shown in Subsection~\ref{subsec:xdp-on-the-client}), can be similarly extended to \ac{XDP}. As written in Bianconi et al.~\cite{xdp_multibuff_2019}, initial efforts towards this integration are already underway, and \ac{XDP} Fragments~\cite{af_xdp_driver_support}, which is a required component to support \ac{GRO} in \ac{XDP}, is gaining support across an increasing number of drivers. As seen in Figure~\ref{fig:dogecoin-client-throughput}, the difference between including and not including \ac{GRO} makes a dramatic impact to the default datapath, so gains to \ac{XDP} could offer similar upside.
 
-\begin{figure}
-	\centering
-	\includegraphics[width=.85\linewidth]{pics/gro-with-xdp.pdf}
-	\caption[\ac{GRO} Offload with XDP.]{GRO Offload with XDP.}
-	\label{fig:gro-offload-with-xdp}
-\end{figure}
+% \begin{figure}
+% 	\centering
+% 	\includegraphics[width=.85\linewidth]{pics/gro-with-xdp.pdf}
+% 	\caption[\ac{GRO} Offload with XDP.]{GRO Offload with XDP.}
+% 	\label{fig:gro-offload-with-xdp}
+% \end{figure}
 
 \subsubsection{Increasing the TX Batch Size}
 \label{subsubsec:increasing-tx-batch-size}
-One potential modification to MsQuic for enhanced transmit (TX) performance involves increasing the TX ring's batch size. In the MsQuic version 2.4.7 used for our measurements, the \texttt{CxPlatDpRawTxEnqueue} function currently reserves only a single descriptor from the TX queue when sending data~\footnote{\href{https://github.com/microsoft/msquic/blob/a6fe43d7928dc550b2f24599a2769df0358f963d/src/platform/datapath_raw_xdp_linux.c\#L1141}{datapath\_raw\_xdp\_linux.c, line 1141}}. As demonstrated by Karlsson et al.~\cite{2018AFXDPPerf}, larger TX batch and ring sizes significantly boost throughput in simple 64-byte packet benchmarks. While this doesn't directly translate to QUIC's MTU-sized packets, it indicates a promising direction. Implementing this change would require substantial refactoring to the MsQuic \ac{XDP} datapath logic.
+One promising modification to MsQuic for improved transmit (TX) performance involves increasing the TX ring's batch size. In MsQuic version 2.4.7, which was used for our measurements, the \texttt{CxPlatDpRawTxEnqueue} function currently reserves only a single descriptor from the TX queue for each data transmission\footnote{\href{https://github.com/microsoft/msquic/blob/a6fe43d7928dc550b2f24599a2769df0358f963d/src/platform/datapath\_raw\_xdp\_linux.c\#L1141}{datapath\_raw\_xdp\_linux.c, line 1141}}. Evidence from Karlsson et al.~\cite{2018AFXDPPerf} clearly shows that larger TX batch and ring sizes significantly boost throughput in 64-byte packet benchmarks. Moreover, given that the kernel supports a maximum TX batch size of thirty-two\footnote{https://elixir.bootlin.com/linux/v6.1/source/net/xdp/xsk.c\#L33}, similar gains to those present in the RX batch size increases as illustrated in Figure~\ref{fig:xdp-batch-size} could be realized.
 
-\subsubsection{Encryption \ac{NIC} Hardware Offload}
+\subsubsection{Expanding \ac{NIC} Hardware Offloads}
 \label{subsubsec:encryption-hw-offload}
-Finally, as highlighted by Jaeger et al.~\cite{quic_on_the_highway}, encryption and decryption are the second largest consumers of CPU resources after packet I/O. Consequently, enabling hardware offload for these tasks would significantly impact performance. MsQuic is currently focused on enabling such offload capabilities~\footnote{https://github.com/microsoft/msquic/issues/4780}, with a proposal already describing the necessary steps for hardware vendors~\footnote{https://github.com/microsoft/net-offloads/blob/main/quic-encryption-offload.md}. Exploring this area could thus be a valid approach to improving throughput.
+As highlighted by Jaeger et al.~\cite{quic_on_the_highway}, encryption and decryption are the second largest consumers of CPU resources after packet I/O. Consequently, enabling hardware offload for these tasks would significantly impact performance. MsQuic is currently focused on enabling such offload capabilities\footnote{https://github.com/microsoft/msquic/issues/4780}, with a proposal already describing the necessary steps for hardware vendors to offer support\footnote{https://github.com/microsoft/net-offloads/blob/main/quic-encryption-offload.md}. Exploring this area could thus be a valid approach to improving throughput.
+
+Finally, as detailed in Yang et al.~\cite{10.1145/3405796.3405827}, hardware offloading can be pushed yet even further to also include features such as packet reordering and checksum offloading. Fundamentally, the more work a \ac{NIC} takes off the CPU, the more cycles the CPU will have for other processes.
+
+% As described in Subsection~\ref{subsec:af-xdp-socket}, UMEM frames contain an MTU-sized packet, which is to be later sent off on the \ac{NIC}. As a result, each UMEM frame is typically within the range 2048 to 4096 bytes. However, for each packet, this means MsQuic must copy some amount of payload data into each frame and add headers for each. Ideally, this work would be hardware-offloaded. Another approach would therefore be to extend the AF\_XDP API such that it supports huge pages\footnote{https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt}, which would consequently allow the application to copy a much larger chunk of data into the frame while only adding a single header. Later, the \ac{NIC} could copy the data into its own internal memory, slice up the data into MTU-sized packets and send it out. Note, however, that this approach would also require encryption offloading within the \ac{NIC}, alongside a significant amount of QUIC protocol offloading due to the requirement of packing the data within stream frames.
