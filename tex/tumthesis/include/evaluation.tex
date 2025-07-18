@@ -114,12 +114,22 @@ An alternative, or complementary, explanation involves the NAPI\_POLL\_WEIGHT pa
 
 \subsection{NIC to Userspace Traversal time with PTP}
 \label{sec:nic-to-userspace}
+To evaluate the relative performance of different datapaths, we measured the time difference between a packet's arrival at the Network Interface Card (NIC) and its subsequent reception within MsQuic in userspace. Figure~\ref{fig:ptp-topology} presents two box plots illustrating these differences for both the default and \ac{XDP} datapaths. The significant overlap in median values, interquartile ranges, and whiskers indicates no statistically significant difference in datapath traversal times between the two approaches. This finding is further supported by Figure~\ref{fig:ptp-log-cdf}, which displays the \ac{CDF} of NIC-to-userspace time differences for each datapath. The only notable distinction is the presence of upper-bound outliers in the non-XDP case. While the precise cause of these outlier delays is unclear, one potential reason could be packets remaining in the socket queue for extended periods.
+
+In summary, despite expectations, the AF\_XDP datapath did not demonstrate superior performance compared to the default datapath for this specific measurement. Consequently, further optimization of this particular datapath is unlikely to yield meaningful improvements. This is primarily because network round-trip times are typically measured in milliseconds and increase proportionally with geographical distance between nodes~\cite{10155553}. Therefore, when aiming to reduce latency between networked systems, relocating nodes closer together will have a far greater impact than optimizing the microsecond-level datapath latency within individual hosts.
 
 \begin{figure}
 	\centering
-	\includegraphics[width=.75\linewidth]{pics/network-stack-diff.pdf}
-	\caption[Userspace-NIC Timestamp Differences.]{Network stack time differences between userspace and NIC hardware timestamps.}
+	\includegraphics[width=.85\linewidth]{pics/network-stack-diff.pdf}
+	\caption[Userspace-NIC Timestamp Differences as Boxplots.]{Network stack time differences between userspace and NIC hardware timestamps using the topology seen in Figure~\ref{fig:ptp-topology}.}
 	\label{fig:network-stack-diff}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.85\linewidth]{pics/ptp-log-cdf.pdf}
+	\caption[Userspace-NIC Timestamp Differences as a CDF Plot.]{Network stack time differences between userspace and NIC hardware timestamps as a CDF plot.}
+	\label{fig:ptp-log-cdf}
 \end{figure}
 
 \section{Taxonomy}
