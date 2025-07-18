@@ -1,80 +1,116 @@
 \chapter{Evaluation}
 \label{chap:evaluation}
+As detailed in Chapter~\ref{chap:implementation}, we used our modifications to the \ac{QIR} to perform various measurements. In Section~\ref{sec:xdp-modes}, we analyze the impact on goodput when using different \ac{XDP} modes (XDP\_SKB, XDP\_DRV with no zero-copy, and XDP\_DRV with zero-copy) on both the client and server. We also evaluate the effect of different batch sizes for the AF\_XDP RX ring buffer. Following this, Section~\ref{sec:nic-to-userspace} analyzes the packet transit time from the \ac{NIC} to userspace for both the standard Linux datapath and AF\_XDP. Finally, Section~\ref{sec:taxonomy} presents a taxonomy comparing different approaches to reducing packet I/O within the context of QUIC.
 
-As described in Chapter~\ref{chap:implementation}, we took our modifications to the \ac{QIR} and performed various measurements. In Section~\ref{sec:rx-batch-sizes}, we evaluate the effect of different batch sizes for the AF\_XDP RX ring buffer. In Section~\ref{sec:xdp-modes}, we analyze the impact on goodput from using the \ac{XDP} modes XDP\_SKB, XDP\_DRV with no zero-copy, and XDP\_DRV with zero-copy when present in the client or in the server. In Section~\ref{sec:nic-to-userspace}, we analyze the time it took for a packet to go from the \ac{NIC} into userspace from the standard Linux datapath and AF\_XDP. Finally, in Section~\ref{sec:taxonomy}, we create a taxonomy comparing different approaches to reducing packet I/O within the context of QUIC.
+For all measurements, except those involving \ac{PTP}, we conducted 20 iterations of an 8 Gigabyte file download. For the \ac{PTP} measurements, a single iteration of a 128 Megabyte file download was sufficient, as our packet-level granularity allowed us to sample tens of thousands of packets in one measurement.
 
-For all but the \ac{PTP} measurements, we ran 20 iterations of an 8 Gigabyte file download. For the \ac{PTP} measurements, we ran 1 iteration of a 128 Megabyte file download but given that our granularity was at the packet level, we were able to sample tens of thousands of packets in one measurement.
-
-Lastly, in all but the \ac{PTP} measurement, the whiskers represent one standard deviation from the mean. For the \ac{PTP} measurement, the whiskers represent the minimum and maximum values, excluding outliers.
-
-\section{RX Batch Sizes}
-\label{sec:rx-batch-sizes}
-As described in Subsection~\ref{subsec:variation-of-batch-sizes}, the variation of batch sizes for the RX ring buffer can have an influence on the performance of a QUIC implementation. Seen in Figure~\ref{fig:xdp-batch-size}, we can see how how the the total achieved throughput increases for every multiple of 2 until an RX batch size of 32, at which point it stagnates.
-
-One potential explanation for this behavior is that at a batch size of 32, this feature no longer becomes the biggest bottleneck in the application. Given that MsQuic must do work on each packet after it has fetched them (e.g. decrypting the payload, or stripping and parsing the headers), with a big enough batch size, it will always have enough packets at hand to saturate the CPU completely without having to wait for any more packets.
-
-Another potential explanation is with the \texttt{NAPI\_POLL\_WEIGHT}\footnote{https://elixir.bootlin.com/linux/v6.1/source/include/linux/netdevice.h\#L2547}. As mentioned in Chapter~\ref{chap:background}, a NAPI\_CONTEXT is created after a packet is \ac{DMA}ed into kernel memory and a corresponding hardware interrupt is generated. The NAPI\_CONTEXT then becomes responsible for polling the \ac{NIC} for new packets rather than waiting for interrupts, which eliminates the risk of an interrupt storm from occurring. Although technically overwriteable by drivers, \texttt{NAPI\_POLL\_WEIGHT} is set to a default value of 64, meaning that each poll may process 64 descriptors at one time. It is therefore possible that at a certain RX batch size, the MsQuic application can consume packets at a higher rate than the NAPI\_CONTEXT can fetch them.
-
-\begin{figure}
-	\centering
-	\includegraphics[width=.75\linewidth]{pics/dogecoin-batch-size.pdf}
-	\caption[Throughput vs RX Batch Size on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput with \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs and \emph{Intel X552 10 GbE SFP+} NICs using different RX batch sizes on the AF\_XDP client.}
-	\label{fig:xdp-batch-size}
-\end{figure}
+Finally, with respect to data representation, for all measurements except \ac{PTP}, the whiskers on our plots represent one standard deviation from the mean. For the \ac{PTP} measurements, the whiskers adhere to the 1.5 Interquartile Range (IQR) rule. That is, the top whisker extends to the largest data point no more than $\text{Q3}+1.5*\text{IQR}$, and the bottom whisker extends to the smallest data point no less than $\text{Q1}-1.5*\text{IQR}$. The $\text{IQR}$ itself is defined as $\text{IQR}=\text{Q3}-\text{Q1}$, encompassing the middle 50\% of the data. $\text{Q1}$ represents the 25th percentile, and $\text{Q3}$ represents the 75th percentile. All data values falling outside the whiskers are considered outliers.
 
 \section{XDP Modes}
 \label{sec:xdp-modes}
+The following subsections detail the implications of using AF\_XDP on the client and server.
 
-\begin{figure}
-	\centering
-	\includegraphics[width=.75\linewidth]{pics/dogecoin-client-throughput.pdf}
-	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput on Dogecoin using different XDP Modes on the AF\_XDP client.}
-	\label{fig:dogecoin-client-throughput}
-\end{figure}
+\subsection{AF\_XDP on the Server}
+\label{subsec:xdp-on-the-server}
+Figures~\ref{fig:opulous-server-throughput} and~\ref{fig:dogecoin-server-throughput} illustrate the goodput measured with AF\_XDP on the servers. In this file-download scenario, the server primarily transmits data, placing a disproportionate load on the TX datapath, which therefore provides a strong proxy for evaluating the TX datapath performance.
 
-\begin{figure}
-	\centering
-	\includegraphics[width=.75\linewidth]{pics/opulous-client-throughput.pdf}
-	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5} Driver.]{A Comparison of the total achieved throughput on Opulous using different XDP Modes on the AF\_XDP client.}
-	\label{fig:opulous-client-throughput}
-\end{figure}
+Although the AF\_XDP configurations do not achieve higher goodputs than the no-\ac{XDP} case (due to optimizations like \ac{GSO} and sendmmsg(2)), there is a notable discrepancy in goodput between AF\_XDP zero-copy and both AF\_XDP without zero-copy and AF\_XDP SKB. As the figures demonstrate, these differences become even more pronounced on nodes equipped with higher-performance CPUs.
+
+To investigate why this was occurring, we used pidstat\footnote{https://man7.org/linux/man-pages/man1/pidstat.1.html} to monitor CPU utilization. Figure~\ref{fig:pidstat-stacked-plot} presents a stacked bar plot of the average CPU utilizations for the system (kernel) and user (MsQuic) processes on the server during each throughput test. The first important feature to note is that CPU utilization reached 100\% for every server-side mode, whereas corresponding client CPU utilizations averaged 90\% for DRV zero-copy and 68\% for SKB. This clearly indicates the server was the primary bottleneck throughout these tests. More importantly, the SKB and DRV no-zero-copy cases exhibited significantly higher CPU usage in system time compared to the zero-copy case. This further suggests that the low-performing modes were invoking some functions that the zero-copy case was not.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/opulous-server-throughput.pdf}
-	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5} Driver.]{A Comparison of the total achieved throughput on Opulous using different XDP Modes on the AF\_XDP server.}
+	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5} Driver.]{A Comparison of the total achieved throughput using different XDP Modes on the AF\_XDP server. Client and server nodes used \emph{AMD EPYC 9354} CPUs with \emph{Mellanox ConnectX-6} \ac{NIC}s.}
 	\label{fig:opulous-server-throughput}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/dogecoin-server-throughput.pdf}
-	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput on Dogecoin using different XDP Modes on the AF\_XDP server.}
+	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput using different XDP Modes on the AF\_XDP server. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s.}
 	\label{fig:dogecoin-server-throughput}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/pidstat-stacked-plot.pdf}
-	\caption[User and System CPU Usage vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total user and system CPU usage on Dogecoin using different XDP Modes on the AF\_XDP server.}
+	\caption[User and System CPU Usage vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total user and system CPU usage using different XDP Modes on the AF\_XDP server. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s.}
 	\label{fig:pidstat-stacked-plot}
 \end{figure}
+
+To gain a deeper understanding of the increased kernel time, we took perf traces of the server across multiple tests, resulting in the flamegraphs presented in Figures~\ref{fig:flame-drv-zc-server} and~\ref{fig:flame-skb-server}. Notably, the \texttt{sendto} syscall\footnote{https://linux.die.net/man/2/sendto}, highlighted in purple, exhibits drastically higher CPU usage in the SKB case compared to the zero-copy case. Specifically, \texttt{sendto} consumed 32.8\% of the trace's lifetime in SKB mode, but only 15.7\% with zero-copy enabled. Considering that the goodputs for SKB and XDP\_DRV without zero-copy were lower than XDP\_DRV with zero-copy, the corresponding transmission times were longer. A larger chunk of a longer transmission time indicates that the \texttt{sendto} function had an outsized impact.
+
+Drilling further into \texttt{sendto}'s call stack, a key divergence between XDP\_DRV zero-copy and both XDP\_SKB and XDP\_DRV no-zero-copy occurs at the kernel function \texttt{\_\_xsk\_xmit()}\footnote{https://elixir.bootlin.com/linux/v6.1/source/net/xdp/xsk.c\#L597}. Within this function, a conditional check for zero-copy mode determines the execution path:
+
+\begin{itemize}
+    \item If zero-copy is enabled, \texttt{xsk\_wakeup()} is invoked, effectively passing control to the driver for packet transmission.
+    \item If zero-copy is not enabled, \texttt{xsk\_generic\_xmit()} is called. This path is computationally expensive because it necessitates copying the packet from the UMEM frame into kernel memory, as depicted in Figure~\ref{fig:skb-mode}. Conversely, Figure~\ref{fig:xdp-zerocopy} illustrates that zero-copy bypasses this copying step.
+\end{itemize}
+
+% In particular there are three main offenders: \texttt{iommu\_dma\_map\_page}, \texttt{sock\_alloc\_send\_pskb}, and \texttt{sock\_def\_write\_space}. \texttt{iommu\_dma\_map\_page}  
+
+Besides the AF\_XDP discrepencies, another notable feature within Figures~\ref{fig:opulous-server-throughput} and~\ref{fig:dogecoin-server-throughput} is the difference in goodput from disabling \ac{GSO}. This difference in achieved goodput was so stark that all gains above the AF\_XDP datapath were effectively erased. Because \ac{GSO} effectively batches packets together instead of sending each through the network stack, this difference highlights the true overhead involved with all the networking layers.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.99\linewidth]{pics/flame-drv-zc-server.png}
-	\caption[Flamegraph.]{lorem ipsum.}
+	\caption[Flamegraph of XDP\_DRV with Zero-copy Enabled.]{Perf trace of the quicinteropserver during a throughput test using XDP\_DRV with zero-copy enabled. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the \texttt{ixbge} drivers.}
 	\label{fig:flame-drv-zc-server}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.99\linewidth]{pics/flame-skb-server.png}
-	\caption[Flamegraph.]{lorem ipsum.}
+	\caption[Flamegraph of XDP\_SKB.]{Perf trace of the quicinteropserver during a throughput test using XDP\_SKB. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the \texttt{ixbge} drivers.}
 	\label{fig:flame-skb-server}
 \end{figure}
 
-The skb and drv-no-zc are spending their time on iommu\_dma\_map\_page, sock\_alloc\_send\_pskb, and sock\_def\_write\_space. The drv-zc is not doing that at all.
+\subsection{AF\_XDP on the Client}
+\label{subsec:xdp-on-the-client}
+Figures~\ref{fig:dogecoin-client-throughput} and~\ref{fig:opulous-client-throughput} reveal a stark contrast in goodput values for the AF\_XDP modes on the client-side relative to their server counterparts. The fundamental difference between having AF\_XDP on the client versus the server is that for the client, which receives a disproportionately greater amount of packets than it sends, the \ac{XDP} receive hook, invoked for every incoming packet, is triggered more often. Consequently, these client-side results serve as a robust proxy for examining AF\_XDP's RX performance.
+
+However, the results are surprising as in both high- and low-powered CPU configurations, the goodputs across all \ac{XDP} modes were not statistically distinguishable. This finding contradicts our initial expectations. As detailed in Subsection~\ref{subsec:driver-mode-skb-mode}, we anticipated that a data copy into the UMEM would be necessary for both the SKB and DRV no-zero-copy modes, implying a performance overhead. Yet, Figure~\ref{fig:pidstat-stacked-plot-client} shows a strikingly similar distribution of system and user CPU utilization across all \ac{XDP} modes. If our assumption of a copy in SKB and DRV no-zero-copy cases holds, we would expect a notably higher percentage of system CPU usage, a pattern observed with the AF\_XDP server measurements. Unfortunately, this expected increase in system usage was absent. Further attempts to gain clarity through Flamegraph analysis also proved inconclusive.
+
+While a definitive cause for this unexpected similarity in performance across modes remains elusive, one plausible explanation is that zero-copy functionality is not uniformly supported across all \ac{NIC} queues. As suggested by forum discussions (e.g., in the xdp-newbies mailing list\footnote{\href{https://www.spinics.net/lists/xdp-newbies/msg01347.html}{Re: net/mlx5e: bind() always returns EINVAL with XDP\_ZEROCOPY}}), attempting to enable the ZEROCOPY flag during datapath setup might not actually enabled zero-copy. In our case, we predict the 'zero-copy' XDP\_DRV mode to have silently reverted to a copying mechanism.
+
+Finally, consistent with our analysis of disabling \ac{GSO} on the server, Figure~\ref{fig:dogecoin-client-throughput} demonstrates that disabling \ac{GRO} on the client leads to a dramatic decrease in the total goodput. Without this optimization, the AF\_XDP modes achieve higher throughputs than the default network datapath, highlighting the impact of \ac{GRO} on overall performance.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.75\linewidth]{pics/dogecoin-client-throughput.pdf}
+	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput using different XDP Modes on the AF\_XDP client. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the \texttt{ixbge} drivers.}
+	\label{fig:dogecoin-client-throughput}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.75\linewidth]{pics/opulous-client-throughput.pdf}
+	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5} Driver.]{A Comparison of the total achieved throughput using different XDP Modes on the AF\_XDP client. Client and server nodes used \emph{AMD EPYC 9354} CPUs with \emph{Mellanox ConnectX-6} \ac{NIC}s.}
+	\label{fig:opulous-client-throughput}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.75\linewidth]{pics/pidstat-stacked-plot-client.pdf}
+	\caption[User and System CPU Usage vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total user and system CPU usage using different XDP Modes on the AF\_XDP client. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s.}
+	\label{fig:pidstat-stacked-plot-client}
+\end{figure}
+
+\section{RX Batch Sizes}
+\label{sec:rx-batch-sizes}
+As detailed in Figure~\ref{fig:xdp-batch-size}, the configured batch size for the RX ring buffer can significantly influence the performance of a QUIC implementation. Within this image, the total achieved throughput consistently increases for multiples of 2 until an RX batch size of 32, at which point it begins to plateau.
+
+This observed saturation at an RX batch size of 32 suggests a shift in the application's primary bottleneck. Once MsQuic has fetched a sufficiently large batch of packets, it then performs per-packet operations such as decrypting payloads or stripping and parsing headers. At a batch size of 32, it's plausible that MsQuic consistently receives enough packets to fully saturate the CPU with these processing tasks, eliminating any waiting time for additional packets. Consequently, the batch size ceases to be the limiting factor.
+
+An alternative, or complementary, explanation involves the NAPI\_POLL\_WEIGHT parameter. As discussed in Chapter~\ref{chap:background}, a NAPI context is initiated once a packet is DMAed into kernel memory and a hardware interrupt is generated. This NAPI context then takes over polling the \ac{NIC} for new packets. While drivers can technically override it, NAPI\_POLL\_WEIGHT defaults to sixty-four\footnote{https://elixir.bootlin.com/linux/v6.1/source/include/linux/netdevice.h\#L2547}, meaning each poll can process up to 64 descriptors. Therefore, it's conceivable that at an RX batch size of 32, the MsQuic application reaches a point where it attempts to consume packets at a rate higher than the NAPI context can fetch them from the NIC, leading to the observed throughput stagnation.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.75\linewidth]{pics/dogecoin-batch-size.pdf}
+	\caption[Throughput vs RX Batch Size on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the goodput achieved using zero-copy mode with different RX batch sizes on the AF\_XDP client. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s.}
+	\label{fig:xdp-batch-size}
+\end{figure}
 
 \subsection{NIC to Userspace Traversal time with PTP}
 \label{sec:nic-to-userspace}
