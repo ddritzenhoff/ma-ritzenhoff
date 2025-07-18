@@ -97,7 +97,7 @@ Finally, consistent with our analysis of disabling \ac{GSO} on the server, Figur
 	\label{fig:pidstat-stacked-plot-client}
 \end{figure}
 
-\section{RX Batch Sizes}
+\subsection{RX Batch Sizes}
 \label{sec:rx-batch-sizes}
 As detailed in Figure~\ref{fig:xdp-batch-size}, the configured batch size for the RX ring buffer can significantly influence the performance of a QUIC implementation. Within this image, the total achieved throughput consistently increases for multiples of 2 until an RX batch size of 32, at which point it begins to plateau.
 
@@ -112,7 +112,7 @@ An alternative, or complementary, explanation involves the NAPI\_POLL\_WEIGHT pa
 	\label{fig:xdp-batch-size}
 \end{figure}
 
-\subsection{NIC to Userspace Traversal time with PTP}
+\section{NIC to Userspace Traversal time with PTP}
 \label{sec:nic-to-userspace}
 To evaluate the relative performance of different datapaths, we measured the time difference between a packet's arrival at the Network Interface Card (NIC) and its subsequent reception within MsQuic in userspace. Figure~\ref{fig:ptp-topology} presents two box plots illustrating these differences for both the default and \ac{XDP} datapaths. The significant overlap in median values, interquartile ranges, and whiskers indicates no statistically significant difference in datapath traversal times between the two approaches. This finding is further supported by Figure~\ref{fig:ptp-log-cdf}, which displays the \ac{CDF} of NIC-to-userspace time differences for each datapath. The only notable distinction is the presence of upper-bound outliers in the non-XDP case. While the precise cause of these outlier delays is unclear, one potential reason could be packets remaining in the socket queue for extended periods.
 
