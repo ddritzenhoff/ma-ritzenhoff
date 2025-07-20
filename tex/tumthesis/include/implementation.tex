@@ -83,7 +83,7 @@ The solution involved correctly resolving the destination IP address (as shown i
     ip neigh replace $DEST_IP lladdr $MAC_ADDRESS dev $XDP_INTERFACE
 \end{lstlisting}
 
-\subsection{Optimizing the \ac{XDP} Datapath}
+\subsection{Optimizing the XDP Datapath}
 \label{subsec:optimizing-xdp}
 With data exchange now functioning between client and server, a new issue that immediately popped up was the significant amount of time that lapsed between running \texttt{run-client.sh} and data actually being transferred.
 
@@ -105,7 +105,7 @@ Thus, after two simple changes, we were rewarded with a drastic speed-up. The fi
 	\label{fig:xdp-initialization-post-opt}
 \end{figure}
 
-\subsection{MsQuic Release-Mode Test Failures}
+\subsection{MsQuic Release-Mode Goodput Test Failures}
 \label{subsec:spontaneous-test-failures}
 During the \ac{XDP} bring-up, we encountered an additional, perplexing bug. Occasionally, throughput tests using MsQuic Release-mode artifacts would fail. Compounding the issue, these failures produced no discernible error messages, leaving us with minimal diagnostic information. The only clue was that Debug-mode artifacts consistently ran without such failures.
 
@@ -117,26 +117,26 @@ Relatedly, one of the tuneable parameters in the userspace \ac{XDP} logic is the
 
 \subsection{Driver Mode, Zero-Copy Driver Mode, and SKB Mode}
 \label{subsec:driver-mode-skb-mode}
-As described in Section~\ref{sec:xdp}, there are two \ac{XDP} hook points: \texttt{XDP\_DRV} and \texttt{XDP\_SKB}. Additionally, on supported drivers and \ac{NIC}s, an \texttt{AF\_XDP} socket combined with \texttt{XDP\_DRV} can enable the zero-copy option~\cite{af_xdp_concept}. Figures~\ref{fig:skb-mode},~\ref{fig:xdp-no-zerocopy}, and~\ref{fig:xdp-zerocopy} illustrate the packet flow from \ac{NIC} arrival to UMEM copy for skb-mode, driver-mode without zero-copy, and driver-mode with zero-copy, respectively. To evaluate these scenarios, we developed three distinct variants: \texttt{xdp-skb}, \texttt{xdp-drv-no-zc}, and \texttt{xdp-drv-zc}, each corresponding to one of these versions.
+As described in Section~\ref{sec:xdp}, there are two \ac{XDP} hook points: \texttt{XDP\_DRV} and \texttt{XDP\_SKB}. Additionally, on supported drivers and \ac{NIC}s, an \texttt{AF\_XDP} socket combined with \texttt{XDP\_DRV} can enable the zero-copy option~\cite{af_xdp_concept}. Figures~\ref{fig:skb-mode},~\ref{fig:xdp-no-zerocopy}, and~\ref{fig:xdp-zerocopy} illustrate the packet flow from \ac{NIC} arrival to UMEM copy for skb-mode, driver-mode without zero-copy, and driver-mode with zero-copy, respectively. To evaluate these scenarios, we developed three distinct variants: \texttt{xdp-skb}, \texttt{xdp-drv-no-zc}, and \texttt{xdp-drv-zc}, each corresponding to one of these versions. To analyze each mode, we used the \texttt{start-pidstat.sh} and \texttt{start-perf.sh} scripts to analyze where the CPU spent its time.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/skb-mode.pdf}
-	\caption[Packet Traversal with \texttt{AF\_XDP} SKB Mode.]{SKB mode. The \ac{NIC} \ac{DMA}s the packet into kernel memory. After an \texttt{sk\_buff} is allocated, the packet is then copied again from kernel memory into the UMEM.}
+	\caption[Packet Reception with \texttt{AF\_XDP} SKB Mode.]{SKB mode. The \ac{NIC} \ac{DMA}s the packet into kernel memory. After an \texttt{sk\_buff} is allocated, the packet is then copied again from kernel memory into the UMEM.}
 	\label{fig:skb-mode}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/no-xdp-zerocopy.pdf}
-	\caption[Packet Traversal with \texttt{AF\_XDP} Driver Mode and Zero-copy Disabled.]{Driver mode, zero-copy not enabled. The \ac{NIC} \ac{DMA}s the packet into kernel memory, and the packet is copied from kernel memory into the UMEM.}
+	\caption[Packet Reception with \texttt{AF\_XDP} Driver Mode and Zero-copy Disabled.]{Driver mode, zero-copy not enabled. The \ac{NIC} \ac{DMA}s the packet into kernel memory, and the packet is copied from kernel memory into the UMEM.}
 	\label{fig:xdp-no-zerocopy}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/xdp-zerocopy.pdf}
-	\caption[Packet Traversal with \texttt{AF\_XDP} Driver Mode and Zero-copy Enabled.]{Driver mode with zero-copy. The \ac{NIC} \ac{DMA}s the packet directly into the UMEM.}
+	\caption[Packet Reception with \texttt{AF\_XDP} Driver Mode and Zero-copy Enabled.]{Driver mode with zero-copy. The \ac{NIC} \ac{DMA}s the packet directly into the UMEM.}
 	\label{fig:xdp-zerocopy}
 \end{figure}
 

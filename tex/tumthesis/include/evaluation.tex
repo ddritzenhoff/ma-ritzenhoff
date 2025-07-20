@@ -1,10 +1,10 @@
 \chapter{Evaluation}
 \label{chap:evaluation}
-As detailed in Chapter~\ref{chap:implementation}, we used our modifications to the \ac{QIR} to perform various measurements. In Section~\ref{sec:xdp-modes}, we analyze the impact on goodput when using different \ac{XDP} modes (XDP\_SKB, XDP\_DRV with no zero-copy, and XDP\_DRV with zero-copy) on both the client and server. We also evaluate the effect of different batch sizes for the AF\_XDP RX ring buffer. Following this, Section~\ref{sec:nic-to-userspace} analyzes the packet transit time from the \ac{NIC} to userspace for both the standard Linux datapath and AF\_XDP. Finally, Section~\ref{sec:taxonomy} presents a taxonomy comparing different approaches to reducing packet I/O within the context of QUIC.
+As detailed in Chapter~\ref{chap:implementation}, we used our modifications to the \ac{QIR} to perform various measurements. In Section~\ref{sec:xdp-modes}, we analyze the impact on goodput when using different \ac{XDP} modes (i.e. XDP\_SKB, XDP\_DRV with no zero-copy, and XDP\_DRV with zero-copy) on both the client and server. We also evaluate the effect of different batch sizes for the AF\_XDP RX ring buffer. Following this, Section~\ref{sec:nic-to-userspace} analyzes the packet transit time from the \ac{NIC} to userspace for both the standard MsQuic datapath and AF\_XDP. Finally, Section~\ref{sec:taxonomy} presents a taxonomy comparing different approaches to reducing packet I/O within the context of QUIC.
 
 For all measurements, except those involving \ac{PTP}, we conducted 20 iterations of an 8 Gigabyte file download. For the \ac{PTP} measurements, a single iteration of a 128 Megabyte file download was sufficient, as our packet-level granularity allowed us to sample tens of thousands of packets in one measurement.
 
-Finally, with respect to data representation, for all measurements except \ac{PTP}, the whiskers on our plots represent one standard deviation from the mean. For the \ac{PTP} measurements, the whiskers adhere to the 1.5 Interquartile Range (IQR) rule. That is, the top whisker extends to the largest data point no more than $\text{Q3}+1.5*\text{IQR}$, and the bottom whisker extends to the smallest data point no less than $\text{Q1}-1.5*\text{IQR}$. The $\text{IQR}$ itself is defined as $\text{IQR}=\text{Q3}-\text{Q1}$, encompassing the middle 50\% of the data. $\text{Q1}$ represents the 25th percentile, and $\text{Q3}$ represents the 75th percentile. All data values falling outside the whiskers are considered outliers.
+Finally, with respect to data representation, for all measurements except \ac{PTP}, the whiskers on our plots represent one standard deviation from the mean. For the \ac{PTP} measurements, the whiskers adhere to the 1.5 Interquartile Range (IQR) range. That is, the top whisker extends to the largest data point no more than $\text{Q3}+1.5*\text{IQR}$, and the bottom whisker extends to the smallest data point no less than $\text{Q1}-1.5*\text{IQR}$. The $\text{IQR}$ itself is defined as $\text{IQR}=\text{Q3}-\text{Q1}$, encompassing the middle 50\% of the data. $\text{Q1}$ represents the 25th percentile, and $\text{Q3}$ represents the 75th percentile. All data values falling outside the whiskers are considered outliers.
 
 \section{XDP Modes}
 \label{sec:xdp-modes}
@@ -14,21 +14,21 @@ The following subsections detail the implications of using AF\_XDP on the client
 \label{subsec:xdp-on-the-server}
 Figures~\ref{fig:opulous-server-throughput} and~\ref{fig:dogecoin-server-throughput} illustrate the goodput measured with AF\_XDP on the servers. In this file-download scenario, the server primarily transmits data, placing a disproportionate load on the TX datapath, which therefore provides a strong proxy for evaluating the TX datapath performance.
 
-Although the AF\_XDP configurations do not achieve higher goodputs than the no-\ac{XDP} case (due to optimizations like \ac{GSO} and sendmmsg(2)), there is a notable discrepancy in goodput between AF\_XDP zero-copy and both AF\_XDP without zero-copy and AF\_XDP SKB. As the figures demonstrate, these differences become even more pronounced on nodes equipped with higher-performance CPUs.
+Although the AF\_XDP configurations do not achieve higher goodputs than the no-\ac{XDP} case (due to optimizations like \ac{GSO} and \texttt{sendmmsg(2)}), there is a notable discrepancy in goodput between XDP\_DRV zero-copy and both XDP\_SKB and XDP\_DRV without zero-copy. As the figures demonstrate, these differences become even more pronounced on nodes equipped with higher-performance CPUs.
 
-To investigate why this was occurring, we used pidstat\footnote{https://man7.org/linux/man-pages/man1/pidstat.1.html} to monitor CPU utilization. Figure~\ref{fig:pidstat-stacked-plot} presents a stacked bar plot of the average CPU utilizations for the system (kernel) and user (MsQuic) processes on the server during each throughput test. The first important feature to note is that CPU utilization reached 100\% for every server-side mode, whereas corresponding client CPU utilizations averaged 90\% for DRV zero-copy and 68\% for SKB. This clearly indicates the server was the primary bottleneck throughout these tests. More importantly, the SKB and DRV no-zero-copy cases exhibited significantly higher CPU usage in system time compared to the zero-copy case. This further suggests that the low-performing modes were invoking some functions that the zero-copy case was not.
+To investigate why this was occurring, we used pidstat\footnote{https://man7.org/linux/man-pages/man1/pidstat.1.html} to monitor CPU utilization. Figure~\ref{fig:pidstat-stacked-plot} presents a stacked bar plot of the average CPU utilizations for the system (kernel) and user (MsQuic) on the server during each throughput test. The first important feature to note is that CPU utilization reached 100\% for every server-side mode, whereas corresponding client CPU utilizations averaged 90\% for DRV zero-copy and 68\% for SKB. This clearly indicates the server was the primary bottleneck throughout these tests. More importantly, the SKB and DRV no-zero-copy cases exhibited significantly higher CPU usage in system time compared to the zero-copy case. This further suggests that the low-performing modes were invoking some kernel functions that the zero-copy case was not.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/opulous-server-throughput.pdf}
-	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5} Driver.]{A Comparison of the total achieved throughput using different XDP Modes on the AF\_XDP server. Client and server nodes used \emph{AMD EPYC 9354} CPUs with \emph{Mellanox ConnectX-6} \ac{NIC}s.}
+	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP server. Client and server nodes used \emph{AMD EPYC 9354} CPUs with \emph{Mellanox ConnectX-6} \ac{NIC}s.}
 	\label{fig:opulous-server-throughput}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/dogecoin-server-throughput.pdf}
-	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput using different XDP Modes on the AF\_XDP server. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s.}
+	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP server. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s.}
 	\label{fig:dogecoin-server-throughput}
 \end{figure}
 
@@ -39,9 +39,9 @@ To investigate why this was occurring, we used pidstat\footnote{https://man7.org
 	\label{fig:pidstat-stacked-plot}
 \end{figure}
 
-To gain a deeper understanding of the increased kernel time, we took perf traces of the server across multiple tests, resulting in the flamegraphs presented in Figures~\ref{fig:flame-drv-zc-server} and~\ref{fig:flame-skb-server}. Notably, the \texttt{sendto} syscall\footnote{https://linux.die.net/man/2/sendto}, highlighted in purple, exhibits drastically higher CPU usage in the SKB case compared to the zero-copy case. Specifically, \texttt{sendto} consumed 32.8\% of the trace's lifetime in SKB mode, but only 15.7\% with zero-copy enabled. Considering that the goodputs for SKB and XDP\_DRV without zero-copy were lower than XDP\_DRV with zero-copy, the corresponding transmission times were longer. A larger chunk of a longer transmission time indicates that the \texttt{sendto} function had an outsized impact.
+To gain a deeper understanding of the increased kernel time, we took perf traces of the server across multiple tests, resulting in the flamegraphs presented in Figures~\ref{fig:flame-drv-zc-server} and~\ref{fig:flame-skb-server}. Notably, the \texttt{sendto} syscall\footnote{https://linux.die.net/man/2/sendto}, highlighted in purple, exhibits drastically higher CPU usage in the SKB case compared to the zero-copy case. Specifically, \texttt{sendto} consumed 32.8\% of the trace's lifetime in SKB mode, but only 15.7\% with zero-copy enabled. Considering that the goodputs for SKB and XDP\_DRV without zero-copy were lower than XDP\_DRV with zero-copy, the corresponding transmission times were longer. A larger chunk of a longer transmission time indicates that the \texttt{sendto} function had an outsized impact for these two \ac{XDP} modes.
 
-Drilling further into \texttt{sendto}'s call stack, a key divergence between XDP\_DRV zero-copy and both XDP\_SKB and XDP\_DRV no-zero-copy occurs at the kernel function \texttt{\_\_xsk\_xmit()}\footnote{https://elixir.bootlin.com/linux/v6.1/source/net/xdp/xsk.c\#L597}. Within this function, a conditional check for zero-copy mode determines the execution path:
+Drilling further into \texttt{sendto}'s call stack, a key divergence between XDP\_DRV zero-copy and both XDP\_SKB and XDP\_DRV no-zero-copy occurs at the kernel function \texttt{\_\_xsk\_xmit()}\footnote{https://elixir.bootlin.com/linux/v6.1/source/net/xdp/xsk.c\#L597}. Within this function, a conditional check for whether zero-copy mode is enabled determines the execution path:
 
 \begin{itemize}
     \item If zero-copy is enabled, \texttt{xsk\_wakeup()} is invoked, effectively passing control to the driver for packet transmission.
@@ -55,14 +55,14 @@ Besides the AF\_XDP discrepencies, another notable feature within Figures~\ref{f
 \begin{figure}
 	\centering
 	\includegraphics[width=.99\linewidth]{pics/flame-drv-zc-server.png}
-	\caption[Flamegraph of XDP\_DRV with Zero-copy Enabled.]{Perf trace of the quicinteropserver during a throughput test using XDP\_DRV with zero-copy enabled. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the \texttt{ixbge} drivers.}
+	\caption[Flamegraph of XDP\_DRV with Zero-Copy Enabled.]{Perf trace of the quicinteropserver during a throughput test using XDP\_DRV with zero-copy enabled. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the ixgbe drivers.}
 	\label{fig:flame-drv-zc-server}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.99\linewidth]{pics/flame-skb-server.png}
-	\caption[Flamegraph of XDP\_SKB.]{Perf trace of the quicinteropserver during a throughput test using XDP\_SKB. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the \texttt{ixbge} drivers.}
+	\caption[Flamegraph of XDP\_SKB.]{Perf trace of the quicinteropserver during a throughput test using XDP\_SKB. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the ixgbe drivers.}
 	\label{fig:flame-skb-server}
 \end{figure}
 
@@ -72,21 +72,21 @@ Figures~\ref{fig:dogecoin-client-throughput} and~\ref{fig:opulous-client-through
 
 However, the results are surprising as in both high- and low-powered CPU configurations, the goodputs across all \ac{XDP} modes were not statistically distinguishable. This finding contradicts our initial expectations. As detailed in Subsection~\ref{subsec:driver-mode-skb-mode}, we anticipated that a data copy into the UMEM would be necessary for both the SKB and DRV no-zero-copy modes, implying a performance overhead. Yet, Figure~\ref{fig:pidstat-stacked-plot-client} shows a strikingly similar distribution of system and user CPU utilization across all \ac{XDP} modes. If our assumption of a copy in SKB and DRV no-zero-copy cases holds, we would expect a notably higher percentage of system CPU usage, a pattern observed with the AF\_XDP server measurements. Unfortunately, this expected increase in system usage was absent. Further attempts to gain clarity through Flamegraph analysis also proved inconclusive.
 
-While a definitive cause for this unexpected similarity in performance across modes remains elusive, one plausible explanation is that zero-copy functionality is not uniformly supported across all \ac{NIC} queues. As suggested by forum discussions (e.g., in the xdp-newbies mailing list\footnote{\href{https://www.spinics.net/lists/xdp-newbies/msg01347.html}{Re: net/mlx5e: bind() always returns EINVAL with XDP\_ZEROCOPY}}), attempting to enable the ZEROCOPY flag during datapath setup might not actually enabled zero-copy. In our case, we predict the 'zero-copy' XDP\_DRV mode to have silently reverted to a copying mechanism.
+While a definitive cause for this unexpected similarity in performance across modes remains elusive, one plausible explanation is that zero-copy functionality is not uniformly supported across all \ac{NIC} queues. As suggested by forum discussions (e.g., in the xdp-newbies mailing list\footnote{\href{https://www.spinics.net/lists/xdp-newbies/msg01347.html}{Re: net/mlx5e: bind() always returns EINVAL with XDP\_ZEROCOPY}}), attempting to enable the ZEROCOPY flag during datapath setup might not actually enabled zero-copy. In our case, we predict the 'zero-copy' XDP\_DRV mode to have silently reverted to copying.
 
-Finally, consistent with our analysis of disabling \ac{GSO} on the server, Figure~\ref{fig:dogecoin-client-throughput} demonstrates that disabling \ac{GRO} on the client leads to a dramatic decrease in the total goodput. Without this optimization, the AF\_XDP modes achieve higher throughputs than the default network datapath, highlighting the impact of \ac{GRO} on overall performance.
+Finally, consistent with our analysis of disabling \ac{GSO} on the server, Figure~\ref{fig:dogecoin-client-throughput} demonstrates that disabling \ac{GRO} on the client also leads to a dramatic decrease in the total goodput. Without this optimization, the AF\_XDP modes achieve higher goodputs than the default network datapath, highlighting the impact of \ac{GRO} on overall performance.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/dogecoin-client-throughput.pdf}
-	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved throughput using different XDP Modes on the AF\_XDP client. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the \texttt{ixbge} drivers.}
+	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP client. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the ixgbe drivers.}
 	\label{fig:dogecoin-client-throughput}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/opulous-client-throughput.pdf}
-	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5} Driver.]{A Comparison of the total achieved throughput using different XDP Modes on the AF\_XDP client. Client and server nodes used \emph{AMD EPYC 9354} CPUs with \emph{Mellanox ConnectX-6} \ac{NIC}s.}
+	\caption[Throughput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{mlx5} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP client. Client and server nodes used \emph{AMD EPYC 9354} CPUs with \emph{Mellanox ConnectX-6} \ac{NIC}s and the mlx5 drivers.}
 	\label{fig:opulous-client-throughput}
 \end{figure}
 
@@ -99,11 +99,11 @@ Finally, consistent with our analysis of disabling \ac{GSO} on the server, Figur
 
 \subsection{RX Batch Sizes}
 \label{sec:rx-batch-sizes}
-As detailed in Figure~\ref{fig:xdp-batch-size}, the configured batch size for the RX ring buffer can significantly influence the performance of a QUIC implementation. Within this image, the total achieved throughput consistently increases for multiples of 2 until an RX batch size of 32, at which point it begins to plateau.
+As detailed in Figure~\ref{fig:xdp-batch-size}, the configured batch size for the RX ring buffer can significantly influence the goodput of MsQuic. The diagram shows how the total achieved throughput consistently increases for multiples of 2 until an RX batch size of 32, at which point it begins to plateau.
 
 This observed saturation at an RX batch size of 32 suggests a shift in the application's primary bottleneck. Once MsQuic has fetched a sufficiently large batch of packets, it then performs per-packet operations such as decrypting payloads or stripping and parsing headers. At a batch size of 32, it's plausible that MsQuic consistently receives enough packets to fully saturate the CPU with these processing tasks, eliminating any waiting time for additional packets. Consequently, the batch size ceases to be the limiting factor.
 
-An alternative, or complementary, explanation involves the NAPI\_POLL\_WEIGHT parameter. As discussed in Chapter~\ref{chap:background}, a NAPI context is initiated once a packet is DMAed into kernel memory and a hardware interrupt is generated. This NAPI context then takes over polling the \ac{NIC} for new packets. While drivers can technically override it, NAPI\_POLL\_WEIGHT defaults to sixty-four\footnote{https://elixir.bootlin.com/linux/v6.1/source/include/linux/netdevice.h\#L2547}, meaning each poll can process up to 64 descriptors. Therefore, it's conceivable that at an RX batch size of 32, the MsQuic application reaches a point where it attempts to consume packets at a rate higher than the NAPI context can fetch them from the NIC, leading to the observed throughput stagnation.
+An alternative, or complementary, explanation involves the NAPI\_POLL\_WEIGHT parameter. As discussed in Chapter~\ref{chap:background}, a NAPI context is initiated once a packet is DMAed into kernel memory and a hardware interrupt is generated. This NAPI context then begins polling the \ac{NIC} for new packets. While drivers can technically override it, NAPI\_POLL\_WEIGHT defaults to sixty-four\footnote{https://elixir.bootlin.com/linux/v6.1/source/include/linux/netdevice.h\#L2547}, meaning each poll can process up to 64 descriptors. It is conceivable that from an RX batch size of 32, the MsQuic application reaches a point where it consumes packets at a rate higher than the NAPI context can fetch them from the NIC, leading to the observed throughput stagnation.
 
 \begin{figure}
 	\centering
@@ -112,34 +112,54 @@ An alternative, or complementary, explanation involves the NAPI\_POLL\_WEIGHT pa
 	\label{fig:xdp-batch-size}
 \end{figure}
 
-\section{NIC to Userspace Traversal time with PTP}
+\section{NIC to Userspace Packet Traversal time with PTP}
 \label{sec:nic-to-userspace}
 To evaluate the relative performance of different datapaths, we measured the time difference between a packet's arrival at the Network Interface Card (NIC) and its subsequent reception within MsQuic in userspace. Figure~\ref{fig:ptp-topology} presents two box plots illustrating these differences for both the default and \ac{XDP} datapaths. The significant overlap in median values, interquartile ranges, and whiskers indicates no statistically significant difference in datapath traversal times between the two approaches. This finding is further supported by Figure~\ref{fig:ptp-log-cdf}, which displays the \ac{CDF} of NIC-to-userspace time differences for each datapath. The only notable distinction is the presence of upper-bound outliers in the non-XDP case. While the precise cause of these outlier delays is unclear, one potential reason could be packets remaining in the socket queue for extended periods.
 
-In summary, despite expectations, the AF\_XDP datapath did not demonstrate superior performance compared to the default datapath for this specific measurement. Consequently, further optimization of this particular datapath is unlikely to yield meaningful improvements. This is primarily because network round-trip times are typically measured in milliseconds and increase proportionally with geographical distance between nodes~\cite{10155553}. Therefore, when aiming to reduce latency between networked systems, relocating nodes closer together will have a far greater impact than optimizing the microsecond-level datapath latency within individual hosts.
+In summary, despite expectations, the AF\_XDP datapath did not demonstrate superior performance compared to the default datapath for this specific measurement. Moreover, further optimization of this particular datapath is unlikely to yield meaningful improvements. This is primarily because network round-trip times are typically measured in milliseconds and increase proportionally with geographical distance between nodes~\cite{10155553}. Therefore, when aiming to reduce latency between networked systems, relocating nodes closer together will have a far greater impact than optimizing the microsecond-level datapath latency within individual hosts.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.85\linewidth]{pics/network-stack-diff.pdf}
-	\caption[Userspace-NIC Timestamp Differences as Boxplots.]{Network stack time differences between userspace and NIC hardware timestamps using the topology seen in Figure~\ref{fig:ptp-topology}.}
+	\caption[Userspace-NIC Timestamp Differences as Boxplots.]{Time differences between userspace and NIC hardware timestamps using the topology seen in Figure~\ref{fig:ptp-topology}.}
 	\label{fig:network-stack-diff}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.85\linewidth]{pics/ptp-log-cdf.pdf}
-	\caption[Userspace-NIC Timestamp Differences as a CDF Plot.]{Network stack time differences between userspace and NIC hardware timestamps as a CDF plot.}
+	\caption[Userspace-NIC Timestamp Differences as a CDF Plot.]{Time differences between userspace and NIC hardware timestamps as a CDF plot.}
 	\label{fig:ptp-log-cdf}
 \end{figure}
 
-\section{Taxonomy}
+\section{Taxonomy over QUIC Datapaths}
 \label{sec:taxonomy}
+To comprehensively analyze QUIC datapaths, we compare \ac{DPDK}, in-kernel QUIC (lxin-quic), and AF\_XDP, describing the unique tradeoffs inherent in each approach.
 
-- Lxin-quic
-- DPDK
-- XDP
+\subsection{Implementation Complexity}
+\label{subsec:implementation-complexity}
 
+An immediate benefit of lxin-quic is its proposed seamless integration into the standardized Linux socket APIs. This means applications already using the Linux socket API for \ac{TCP} can leverage the same networking system calls such as \texttt{listen(2)}, \texttt{accept(2)}, \texttt{connect(2)}, \texttt{sendmsg(2)}, and \texttt{recvmsg(2)} for QUIC\footnote{https://lwn.net/Articles/1028932/}. This significantly reduces the friction associated with adopting QUIC. In contrast, userspace QUIC implementations lack a standardized API, requiring a distinct integration process for each. Consequently, \ac{DPDK} and AF\_XDP, which primarily support userspace QUIC, become inherently more complex to use.
 
+Moreover, there is also the concept of availability. \ac{DPDK}, for instance, is limited to a specific set of \ac{NIC}s and drivers\footnote{https://core.dpdk.org/supported/\#nics}. While XDP\_SKB mode enjoys native Linux support, its XDP\_DRV counterpart requires specific driver implementation, though support for this has been increasing with each new kernel version\footnote{https://docs.ebpf.io/linux/program-type/BPF\_PROG\_TYPE\_XDP/\#driver-support}. Lxin-quic, as a loadable kernel module, must be built against a precise kernel version due to the unstable kernel ABI across releases. While in-kernel QUIC might eventually be integrated into the core kernel codebase, its current modular status places an additional maintenance burden on its developers.
 
+\subsection{Performance Improvement Potential}
+\label{subsec:performance-improvement-potential}
 
-QUIC optimizations, organizing each based on implementation complexity, performance improvement potential, unwanted side effects, flexibility, privilege level usage, and dynamic vs. static loading.
+One niche application for transport protocols is serving files from storage over the network, similar what a streaming service provider like Netflix would do. As shown in Figure~\ref{fig:memory-bandwidth-QUIC}, the problem with userspace QUIC is that it may not use the \texttt{sendfile(2)} system call, which is beneficial due to avoiding a copy into userspace. For this use case, in-kernel QUIC is advantageous. For \ac{DPDK}, while not having access to \texttt{sendfile(2)}, it may use other methods such as \ac{SPDK}\footnote{https://spdk.io/} to achieve high goodput. Finally, AF\_XDP does not offer any advantage as it is simply a datapath from the kernel to userspace within the context of networking.
+
+\subsection{Unwanted Side Effects}
+\label{subsec:unwanted-side-effects}
+
+One significant drawback of \ac{DPDK} stems from its kernel bypass approach. Here, \ac{DPDK} forfeits the benefits of the established Linux kernel networking stack. Consequently, this requires recreating a complete network stack, including drivers, within the \ac{DPDK} domain. Furthermore, the entire ecosystem of tools for monitoring, managing, and troubleshooting \ac{DPDK} applications also needs to be duplicated or developed from scratch. \ac{DPDK}'s smaller user base compared to the Linux kernel also leads to higher maintenance costs as the maintencance burden cannot be spread across more developers. Finally, \ac{DPDK} gains exclusive control over a \ac{NIC} by detaching it from the kernel, rendering the \ac{NIC} 'invisible' to standard Linux networking tools. This becomes particularly problematic with single-\ac{NIC} systems, as it prevents other userspace applications from accessing the network.
+
+While moving QUIC into the Linux kernel could reduce packet I/O overhead, a fundamental challenge, as discussed in Subsection~\ref{subsec:slow-adoption-of-new-features}, is the inherent slowdown in development velocity for kernel software. For instance, a bug fix necessitates either patching and recompiling the kernel or upgrading the entire kernel version, affecting every application on the operating system. In contrast, userspace applications can independently manage their versions. Debugging kernel-level QUIC also remains a complex endeavor. Options like print debugging, \ac{eBPF} programs, or perf are available, but comprehensive step-through debugging often requires emulating the entire system with tools like QEMU\footnote{https://www.qemu.org/}. This adds significantly more friction compared to debugging in userspace.
+
+A notable disadvantage of AF\_XDP is its requirement for in-depth knowledge of kernel internals, including \ac{eBPF}, \ac{XDP} hooks, and AF\_XDP-specific features like ring buffers and the UMEM region. Moreover, despite ongoing improvements, documentation remains sparse, especially concerning driver-related issues, as detailed in Subsection~\ref{subsec:xdp-on-the-client}. This contrasts with in-kernel QUIC, which would leverage standardized networking APIs already familiar to many developers.
+
+\subsection{Bring-up and Privilege Level Usage}
+\label{subsec:bring-up-and-privelege-level-usage}
+
+Bringing up lxin-quic necessitates loading it as a kernel module, which, like other kernel modules, requires root privileges or the CAP\_SYS\_MODULE capability\footnote{https://man7.org/linux/man-pages/man7/capabilities.7.html}. Similarly, \ac{DPDK} depends on the \texttt{vfio-pci} kernel module for \ac{NIC} interaction and thus also requires higher privileges.
+
+Regarding \ac{eBPF}, while certain limited program types like BPF\_PROG\_TYPE\_SOCKET\_FILTER can be loaded without elevated privileges, \ac{XDP} programs (of type BPF\_PROG\_TYPE\_XDP) require higher privileges\footnote{https://man7.org/linux/man-pages/man2/bpf.2.html}. However, a key advantage of \ac{XDP}, which is particularly beneficial for applications such as \ac{DDoS} firewalls, is its ability to atomically swap \ac{eBPF} programs at runtime\footnote{https://lwn.net/Articles/815707/}. This avoids network traffic interference and allows the \ac{XDP} program's logic to adapt dynamically to changing traffic patterns.

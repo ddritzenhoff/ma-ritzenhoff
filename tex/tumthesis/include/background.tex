@@ -84,7 +84,7 @@ This all goes to say that QUIC itself is not a silver bullet, and there exist ma
 \subsection{Instruction Set}
 \label{subsec:instruction-set}
 \ac{BPF} is a general purpose \ac{RISC} architecture which can be used as a compilation target for
-compiler back ends. Typically written in a subset of C that does not allow features such as arbitrary loops, unbounded recursion, and arbitrary memory accesses, \ac{BPF} bytecode is loaded by the kernel at runtime and is later \ac{JIT} compiled into native opcodes for better performance. This approach allows the kernel to become programmable without having to cross the user-kernel space boundary. This is incredibly advantageous because it offers a flexible new way of gaining visibility into the Linux kernel as well as boosting data path performance by enabling data handling at the earliest possible stages. Moreover, BPF programs can be atomically updated at runtime without requiring a kernel restart, allowing for dynamic changes throughout a program's lifecycle.
+compiler back ends. Typically written in a subset of C that does not allow features such as arbitrary loops, unbounded recursion, and arbitrary memory accesses, \ac{BPF} bytecode is loaded by the kernel at runtime and is later \ac{JIT} compiled into native opcodes for better performance. This approach allows the kernel to become programmable without having to cross the user-kernel space boundary. This is incredibly advantageous because it offers a flexible new way of gaining visibility into the Linux kernel as well as boosting datapath performance by enabling data handling at the earliest possible stages. Moreover, BPF programs can be atomically updated at runtime without requiring a kernel restart, allowing for dynamic changes throughout a program's lifecycle.
 
 \ac{BPF} consists of eleven 64 bit registers with 32 bit subregisters. It also contains a 512 byte stack space and a program counter. Each of the eleven registers are named \texttt{r0 - r10}, and the default operating mode is 64 bits. The 32 bit subregisters are only accessible through ALU operations. Table~\ref{tab:ebpf_registers} shows the BPF calling convention.
 
@@ -493,7 +493,7 @@ With the packet now present in the buffer, the \ac{NIC} driver creates an \textt
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/recvfrom(2)v2.pdf}
-	\caption[Receiving with \texttt{recvfrom(2)}.]{Receiving with \texttt{recvfrom(2)}.}
+	\caption[Packet Reception with \texttt{recvfrom(2)}.]{Packet Reception with \texttt{recvfrom(2)}.}
 	\label{fig:recvfrom}
 \end{figure}
 
@@ -504,7 +504,7 @@ As seen in Figure~\ref{fig:recvmmsg}, the \texttt{recvmmsg(2)} system call repre
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/recvmmsg(2)v2.pdf}
-	\caption[Receiving with \texttt{recvmmsg(2)}.]{Receiving with \texttt{recvmmsg(2)}.}
+	\caption[Packet Reception with \texttt{recvmmsg(2)}.]{Packet Reception with \texttt{recvmmsg(2)}.}
 	\label{fig:recvmmsg}
 \end{figure}
 
@@ -515,7 +515,7 @@ One downside to the approaches above is that an \texttt{sk\_buff} is allocated f
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/grov2.pdf}
-	\caption[Receiving with \ac{GRO}.]{Receiving with \ac{GRO}.}
+	\caption[Packet Reception with \ac{GRO}.]{Packet Reception with \ac{GRO}.}
 	\label{fig:gro}
 \end{figure}
 
@@ -524,7 +524,7 @@ Finally, we can combine these two enhancements together as seen in Figure~\ref{f
 \begin{figure}
 	\centering
     \includegraphics[width=.95\linewidth]{pics/recvmmsg(2)+grov2.pdf}
-	\caption[Receiving with \ac{GRO} and \texttt{recvmmsg(2)}.]{Receiving with \ac{GRO} and \texttt{recvmmsg(2)}.}
+	\caption[Packet Reception with \ac{GRO} and \texttt{recvmmsg(2)}.]{Packet Reception with \ac{GRO} and \texttt{recvmmsg(2)}.}
 	\label{fig:gro-recvmmsg}
 \end{figure}
 
