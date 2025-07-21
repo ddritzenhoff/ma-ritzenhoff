@@ -1,32 +1,68 @@
 \chapter{Taxonomy over QUIC Datapaths}
 \label{chap:taxonomy}
 
-To comprehensively analyze QUIC datapaths, we compare \ac{DPDK}, in-kernel QUIC (lxin-quic), and AF\_XDP, describing the unique tradeoffs inherent in each approach.
+To comprehensively analyze QUIC datapaths, we compare \ac{DPDK}, AF\_XDP, in-kernel QUIC (lxin-quic), and \ac{GSO}/\ac{GRO}, while describing the unique tradeoffs inherent to each approach. Although the differences between each datapaths are described in more detail within the subsequent sections, Table~\ref{tab:networking-taxonomy} represents a summary.
 
-\section{Implementation Complexity}
-\label{subsec:implementation-complexity}
-
-An immediate benefit of lxin-quic is its proposed seamless integration into the standardized Linux socket APIs. This means applications already using the Linux socket API for \ac{TCP} can leverage the same networking system calls such as \texttt{listen(2)}, \texttt{accept(2)}, \texttt{connect(2)}, \texttt{sendmsg(2)}, and \texttt{recvmsg(2)} for QUIC\footnote{https://lwn.net/Articles/1028932/}. This significantly reduces the friction associated with adopting QUIC. In contrast, userspace QUIC implementations lack a standardized API, requiring a distinct integration process for each. Consequently, \ac{DPDK} and AF\_XDP, which primarily support userspace QUIC, become inherently more complex to use.
-
-Moreover, there is also the concept of availability. \ac{DPDK}, for instance, is limited to a specific set of \ac{NIC}s and drivers\footnote{https://core.dpdk.org/supported/\#nics}. While XDP\_SKB mode enjoys native Linux support, its XDP\_DRV counterpart requires specific driver implementation, though support for this has been increasing with each new kernel version\footnote{https://docs.ebpf.io/linux/program-type/BPF\_PROG\_TYPE\_XDP/\#driver-support}. Lxin-quic, as a loadable kernel module, must be built against a precise kernel version due to the unstable kernel ABI across releases. While in-kernel QUIC might eventually be integrated into the core kernel codebase, its current modular status places an additional maintenance burden on its developers.
+\begin{table}[h]
+    \small
+    \centering
+    \caption[Taxonomy of QUIC Datapaths.]{Taxonomy of QUIC Datapaths. Note that the XDP\_SKB hook is always supported within Linux while XDP\_DRV must be implemented by drivers.}
+    \label{tab:networking-taxonomy}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Metric} & \textbf{DPDK} & \textbf{AF\_XDP} & \textbf{In-kernel QUIC} & \textbf{GSO/GRO} \\
+        \midrule
+        \textbf{Impl. Complexity} & High & High & High & Low \\
+        \textbf{Standardized APIs} & \no & \no & \yes & \yes \\
+        \textbf{Kernel Integration} & Low & Medium & High & High \\
+        \textbf{NIC Sharing} & \no & \yes & \yes & \yes \\
+        \textbf{Hardware Agnostic} & Low & High* & High & High \\
+        \textbf{Maturity} & High & Medium & Low & High\\
+        \textbf{Tooling} & Medium & High & High & High \\
+        \textbf{Privileged Access} & \yes & \yes & \yes & \no \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \section{Performance Improvement Potential}
 \label{subsec:performance-improvement-potential}
 
-One niche application for transport protocols is serving files from storage over the network, similar what a streaming service provider like Netflix would do. As shown in Figure~\ref{fig:memory-bandwidth-QUIC}, the problem with userspace QUIC is that it may not use the \texttt{sendfile(2)} system call, which is beneficial due to avoiding a copy into userspace. For this use case, in-kernel QUIC is advantageous. For \ac{DPDK}, while not having access to \texttt{sendfile(2)}, it may use other methods such as \ac{SPDK}\footnote{https://spdk.io/} to achieve high goodput. Finally, AF\_XDP does not offer any advantage as it is simply a datapath from the kernel to userspace within the context of networking.
+\ac{DPDK} fundamentally achieves reduced packet I/O overhead through kernel bypass. Unlike solutions such as AF\_XDP's use of ring buffers to minimize system calls and context switches, \ac{DPDK} completely sidesteps the Linux kernel's networking stack. It moves all packet processing directly into userspace, allowing applications to communicate directly with the \ac{NIC}. This eliminates the need for frequent system calls and context switches during packet transmissions, significantly boosting performance. To further reduce latencies, \ac{DPDK} employs a \ac{NIC} polling driver model instead of an interrupt-based one and utilizes Hugetables to alleviate pressure on the Translation Lookaside Buffer and to keep related data in contiguous memory.
+
+An in-kernel QUIC implementation offers significant advantages by providing direct access to low-level network stack primitives, such as queueing disciplines. This enables extremely granular control over network traffic, for example, and it represents a level of precision largely unavailable to userspace implementations. Furthermore, the in-kernel approach proves particularly beneficial when utilizing the \texttt{sendfile(2)} system call. As illustrated in Figure~\ref{fig:memory-bandwidth-QUIC}, \texttt{sendfile(2)} avoids costly data copies into userspace by keeping data exclusively within kernel memory, thereby reducing memory bandwidth and CPU usage.
+
+As detailed in Subsection~\ref{subsubsec:gro}, \ac{GRO} and \ac{GSO} fundamentally reduce per-packet processing overhead. They achieve this by aggregating multiple smaller packets into larger "mega-packets" as data traverses the network stack. This aggregation effectively leads to less processing required per byte of payload data. Consequently, this optimization results in fewer system calls during data transmission and reception, thereby reducing the number of costly context switches and improving overall network efficiency.
+
+\section{Implementation Complexity}
+\label{subsec:implementation-complexity}
+% this is about implementing within the quic implementation
+
+Because \ac{DPDK} offloads all networking functionality from the kernel, integrating it as a QUIC datapath necessitates a complete re-implementation of Layer 2 and Layer 3 packet processing, alongside functionality such as checksum calculation, ARP/Neighbor resolution, and routing. Furthermore, sending and receiving packets would require direct interaction with DPDK's API, which has little overlap with the standard Linux networking API. This makes integration extremely complicated.
+
+Implementing QUIC within the kernel moves most of the protocol's functionality there, while leaving the \ac{TLS} handshakes to userspace. This inherent split across the kernel-userspace boundary requires synchronization mechanisms such as netlink or the use of control messages by using \texttt{sendmsg(2)} and \texttt{recvmsg(2)}. Additionally, an existing significant challenge for lxin-quic is its reliance on hooking into kernel functions. These functions are inherently unstable across different kernel versions, potentially leading to substantial maintenance efforts to ensure compatibility and stability across various Linux distributions and kernel updates.
+
+A notable disadvantage of AF\_XDP is its requirement for extensive knowledge of kernel internals. Developers must have an in-depth understanding of \ac{eBPF}, \ac{XDP} hooks, and AF\_XDP-specific features such as the four ring buffers and the UMEM region. This steep learning curve, combined with historically sparse documentation and a limited number of fully-fledged examples, makes AF\_XDP integration within a QUIC implementation also challenging.
+
+Implementing \ac{GSO} and \ac{GRO} within QUIC is comparatively straightforward. It primarily involves leveraging specific kernel socket options and system calls. Relative to the other datapaths discussed, they require minimal setup.
 
 \section{Unwanted Side Effects}
 \label{subsec:unwanted-side-effects}
 
-One significant drawback of \ac{DPDK} stems from its kernel bypass approach. Here, \ac{DPDK} forfeits the benefits of the established Linux kernel networking stack. Consequently, this requires recreating a complete network stack, including drivers, within the \ac{DPDK} domain. Furthermore, the entire ecosystem of tools for monitoring, managing, and troubleshooting \ac{DPDK} applications also needs to be duplicated or developed from scratch. \ac{DPDK}'s smaller user base compared to the Linux kernel also leads to higher maintenance costs as the maintencance burden cannot be spread across more developers. Finally, \ac{DPDK} gains exclusive control over a \ac{NIC} by detaching it from the kernel, rendering the \ac{NIC} 'invisible' to standard Linux networking tools. This becomes particularly problematic with single-\ac{NIC} systems, as it prevents other userspace applications from accessing the network.
+A significant drawback of using \ac{DPDK} is its exclusive control over the \ac{NIC}. By detaching the \ac{NIC} from the kernel, \ac{DPDK} renders it "invisible" to the standard Linux networking tools and other applications. This is particularly problematic in single-\ac{NIC} systems, as it prevents other userspace applications from accessing the network. Furthermore, \ac{DPDK}'s hardware configurations are limited, as it only supports a specific set of \ac{NIC}s and drivers\footnote{https://core.dpdk.org/supported/\#nics}.
 
-While moving QUIC into the Linux kernel could reduce packet I/O overhead, a fundamental challenge, as discussed in Subsection~\ref{subsec:slow-adoption-of-new-features}, is the inherent slowdown in development velocity for kernel software. For instance, a bug fix necessitates either patching and recompiling the kernel or upgrading the entire kernel version, affecting every application on the operating system. In contrast, userspace applications can independently manage their versions. Debugging kernel-level QUIC also remains a complex endeavor. Options like print debugging, \ac{eBPF} programs, or perf are available, but comprehensive step-through debugging often requires emulating the entire system with tools like QEMU\footnote{https://www.qemu.org/}. This adds significantly more friction compared to debugging in userspace.
+The appropriate size of the UMEM region within AF\_XDP is highly dependent on the system's total throughput. As detailed in Subsection \ref{subsec:spontaneous-test-failures}, reserving too small a region can lead to silent packet loss, impacting application reliability.
 
-A notable disadvantage of AF\_XDP is its requirement for in-depth knowledge of kernel internals, including \ac{eBPF}, \ac{XDP} hooks, and AF\_XDP-specific features like ring buffers and the UMEM region. Moreover, despite ongoing improvements, documentation remains sparse, especially concerning driver-related issues, as detailed in Subsection~\ref{subsec:xdp-on-the-client}. This contrasts with in-kernel QUIC, which would leverage standardized networking APIs already familiar to many developers.
+Bugs within an in-kernel QUIC implementation pose a much greater risk than those in a userspace implementation. An in-kernel bug can lead to a system-wide crash, affecting all running applications. Conversely, a bug in a userspace QUIC implementation would typically result in only a single application failure, limiting the scope of impact.
 
-\section{Bring-up and Privilege Level Usage}
+One notable downside to \ac{GSO} is the potential for packet bursts upon transmission. Because packets are "jumbled" together into a large frame until the very last moment in software, there are often few mechanisms to prevent these bursts as they leave the \ac{NIC}, as demonstrated by Kempf et al.~\cite{Kempf_2025}. This unmitigated bursting can lead to performance degradation.
+
+\section{Privilege Level Usage and Deployment}
 \label{subsec:bring-up-and-privelege-level-usage}
 
-Bringing up lxin-quic necessitates loading it as a kernel module, which, like other kernel modules, requires root privileges or the \url{CAP\_SYS\_MODULE} capability\footnote{https://man7.org/linux/man-pages/man7/capabilities.7.html}. Similarly, \ac{DPDK} depends on the \texttt{vfio-pci} kernel module for \ac{NIC} interaction and thus also requires higher privileges.
+Bringing up lxin-quic requires loading it as a kernel module. Like other kernel modules, this operation necessitates root privileges or the \url{CAP\_SYS\_MODULE} capability\footnote{https://man7.org/linux/man-pages/man7/capabilities.7.html}. With respect to deployment, lxin-quic aims for smooth integration by adopting the standardized Linux socket APIs. This means applications already using the Linux socket API for \ac{TCP} can leverage the same networking system calls (e.g., \texttt{listen(2)}, \texttt{accept(2)}, \texttt{connect(2)}, \texttt{sendmsg(2)}, and \texttt{recvmsg(2)}) for QUIC. This significantly reduces the friction associated with its adoption. Finally, it's important to note that lxin-quic is currently under active development and is in an immature state, which may lead to trouble during deployment.
 
-Regarding \ac{eBPF}, while certain limited program types like \url{BPF\_PROG\_TYPE\_SOCKET\_FILTER} can be loaded without elevated privileges, \ac{XDP} programs (of type \url{BPF\_PROG\_TYPE\_XDP}) require higher privileges\footnote{https://man7.org/linux/man-pages/man2/bpf.2.html}. However, a key advantage of \ac{XDP}, which is particularly beneficial for applications such as \ac{DDoS} firewalls, is its ability to atomically swap \ac{eBPF} programs at runtime\footnote{https://lwn.net/Articles/815707/}. This avoids network traffic interference and allows the \ac{XDP} program's logic to adapt dynamically to changing traffic patterns.
+Because \ac{DPDK} also relies on kernel modules such as \texttt{vfio-pci}, it too requires elevated privileges for use. For deployment, Hugepage support must be enabled within the running kernel via the HUGETLBFS option\footnote{https://doc.dpdk.org/guides/linux\_gsg/sys\_reqs.html}. Once the \ac{DPDK} source code is downloaded, it is compiled, and scripts are used to bind the \ac{NIC} to \ac{DPDK}. This binding grants the application complete control over sending and receiving network traffic, after which it may begin to send traffic.
+
+\ac{XDP} also requires higher privileges. Specifically, loading \ac{XDP} programs (of type \url{BPF\_PROG\_TYPE\_XDP}) is a privileged operation. For deployment, a library like libxdp\footnote{https://github.com/xdp-project/xdp-tools/tree/main/lib/libxdp}, which contains \ac{XDP} helper functions, may be used. At runtime, the application loads the \ac{eBPF} program into the \ac{XDP} hook, which then redirects packets to userspace. Subsequently, the application must create the AF\_XDP socket and User Memory (UMEM) region as described in Section~\ref{sec:xdp}.
+
+\ac{GSO} and \ac{GRO} must first be enabled using a tool such as \texttt{ethtool -K}\footnote{https://man7.org/linux/man-pages/man8/ethtool.8.html}. Within the context of \ac{UDP}, the desired segment size (i.e. UDP\_SEGMENT) must then be specified with a \texttt{setsockopt} call. This allows the userspace application to send a "massive" packet through the network stack, which is subsequently split into smaller segments in software just before transmission.
