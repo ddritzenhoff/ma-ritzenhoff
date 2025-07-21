@@ -4,11 +4,13 @@ This chapter details the specific changes made to the \ac{QIR}, the testbed conf
 
 \section{Testbed Setup}
 \label{sec:testbed-setup}
-All measurements were performed on bare metal machines within the chair's testbed.  For test nodes, we used either the \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU with 32 GB of RAM or the \emph{AMD EPYC 9354 32-core} CPU with 768 GB of RAM. To understand how AF\_XDP scales with processing power, nodes were specifically chosen from the lowest and highest ends of CPU capability. Additionally, the two \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} nodes were part of the necessary topology for conducting \ac{PTP} tests, as depicted in Figure~\ref{fig:qir-topology}.
+All measurements were performed on bare metal machines within the chair's testbed.  For test nodes, we used either the \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU with 32 GB of RAM or the \emph{AMD EPYC 9354 @ 3.25 GHz 32-core} CPU with 768 GB of RAM. To understand how AF\_XDP scales with processing power, nodes were specifically chosen from the lowest and highest ends of CPU capability. Additionally, the two \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} nodes were part of the necessary topology for conducting \ac{PTP} tests, as depicted in Figure~\ref{fig:qir-topology}.
 
 To accompany the lower-powered CPUs, the \emph{Intel X552 10 GbE SFP+} \ac{NIC}s with the corresponding ixgbe driver version \emph{6.1.0-17-amd64} were utilized. Their 10 Gbit/s maximum throughput was sufficient to avoid becoming a bottleneck in our evaluations. Crucially, these \ac{NIC}s also offer hardware timestamping support, which is essential for accurate \ac{PTP} operation. 
 
-For the higher-powered \emph{AMD EPYC} CPUs, we used the \emph{Mellanox MT28908 ConnectX-6} \ac{NIC}s with the corresponding \texttt{mlx5\_core} driver version \emph{6.1.0-17-amd64}. These were separated by a 100 Gbit/s link.
+For the higher-powered \emph{AMD EPYC} CPUs, we used the \emph{Mellanox MT28908 ConnectX-6} \ac{NIC}s with the corresponding mlx5\_core driver version \emph{6.1.0-17-amd64}. These were separated by a 100 Gbit/s link.
+
+For clarity, the Intel CPU and NIC configuration will be referred to the "Dogecoin" setup, while the AMD CPU and Mellanox NIC configuration will be known as the "Opulous" setup.
 
 % - Testbed setup
 %     - Talk about what sort of nodes were used. Perhaps justify using dogecoin beacuse of the

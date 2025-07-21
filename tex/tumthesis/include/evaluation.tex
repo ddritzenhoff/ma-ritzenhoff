@@ -1,6 +1,6 @@
 \chapter{Evaluation}
 \label{chap:evaluation}
-As detailed in Chapter~\ref{chap:implementation}, we used our modifications to the \ac{QIR} to perform various measurements. In Section~\ref{sec:xdp-modes}, we analyze the impact on goodput when using different \ac{XDP} modes (i.e. XDP\_SKB, XDP\_DRV with no zero-copy, and XDP\_DRV with zero-copy) on both the client and server. We also evaluate the effect of different batch sizes for the AF\_XDP RX ring buffer. Following this, Section~\ref{sec:nic-to-userspace} analyzes the packet transit time from the \ac{NIC} to userspace for both the standard MsQuic datapath and AF\_XDP. 
+As detailed in Chapter~\ref{chap:implementation}, we used our modifications to the \ac{QIR} to perform various measurements. In Section~\ref{sec:xdp-modes}, we analyze the impact on goodput when using different \ac{XDP} modes (i.e. XDP\_SKB, XDP\_DRV with no zero-copy, and XDP\_DRV with zero-copy (zc)) on both the client and server. We also evaluate the effect of different batch sizes for the AF\_XDP RX ring buffer. Following this, Section~\ref{sec:nic-to-userspace} analyzes the packet transit time from the \ac{NIC} to userspace for both the standard MsQuic datapath and AF\_XDP. 
 
 For all measurements, except those involving \ac{PTP}, we conducted 20 iterations of an 8 Gigabyte file download. For the \ac{PTP} measurements, a single iteration of a 128 Megabyte file download was sufficient, as our packet-level granularity allowed us to sample tens of thousands of packets in one measurement.
 
@@ -21,21 +21,21 @@ To investigate why this was occurring, we used pidstat\footnote{https://man7.org
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/opulous-server-goodput.pdf}
-	\caption[Goodput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP server. Client and server nodes used \emph{AMD EPYC 9354} CPUs with \emph{Mellanox ConnectX-6} \ac{NIC}s.}
+	\caption[Goodput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{mlx5\_core} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP server with the "Opulous" setup.}
 	\label{fig:opulous-server-goodput}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/dogecoin-server-goodput.pdf}
-	\caption[Goodput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP server. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s.}
+	\caption[Goodput vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP server with the "Dogecoin" setup.}
 	\label{fig:dogecoin-server-goodput}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/pidstat-stacked-plot.pdf}
-	\caption[User and System CPU Usage vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total user and system CPU usage using different XDP Modes on the AF\_XDP server. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s.}
+	\caption[User and System CPU Usage vs XDP Modes on \texttt{AF\_XDP} Server with \texttt{ixgbe} Driver.]{A Comparison of the total user and system CPU usage using different XDP Modes on the AF\_XDP server with the "Dogecoin" setup.}
 	\label{fig:pidstat-stacked-plot}
 \end{figure}
 
@@ -55,14 +55,15 @@ Besides the AF\_XDP discrepencies, another notable feature within Figures~\ref{f
 \begin{figure}
 	\centering
 	\includegraphics[width=.99\linewidth]{pics/flame-drv-zc-server.png}
-	\caption[Flamegraph of XDP\_DRV with Zero-Copy Enabled.]{Perf trace of the quicinteropserver during a goodput test using XDP\_DRV with zero-copy enabled. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the ixgbe drivers.}
+	\caption[Flamegraph of XDP\_DRV with Zero-Copy Enabled.]{Perf trace of the quicinteropserver
+	during a goodput test, utilizing the "Dogecoin" setup with XDP\_DRV and zero-copy enabled.}
 	\label{fig:flame-drv-zc-server}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.99\linewidth]{pics/flame-skb-server.png}
-	\caption[Flamegraph of XDP\_SKB.]{Perf trace of the quicinteropserver during a goodput test using XDP\_SKB. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the ixgbe drivers.}
+	\caption[Flamegraph of XDP\_SKB.]{Perf trace of the quicinteropserver during a goodput test, utilizing the "Dogecoin" setup with XDP\_SKB enabled.}
 	\label{fig:flame-skb-server}
 \end{figure}
 
@@ -79,21 +80,21 @@ Finally, consistent with our analysis of disabling \ac{GSO} on the server, Figur
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/dogecoin-client-goodput.pdf}
-	\caption[Goodput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP client. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s and the ixgbe drivers.}
+	\caption[Goodput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP client with the "Dogecoin" setup.}
 	\label{fig:dogecoin-client-goodput}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/opulous-client-goodput.pdf}
-	\caption[Goodput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{mlx5} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP client. Client and server nodes used \emph{AMD EPYC 9354} CPUs with \emph{Mellanox ConnectX-6} \ac{NIC}s and the mlx5 drivers.}
+	\caption[Goodput vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{mlx5\_core} Driver.]{A Comparison of the total achieved goodput using different XDP Modes on the AF\_XDP client with the "Opulous" setup.}
 	\label{fig:opulous-client-goodput}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/pidstat-stacked-plot-client.pdf}
-	\caption[User and System CPU Usage vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total user and system CPU usage using different XDP Modes on the AF\_XDP client. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s.}
+	\caption[User and System CPU Usage vs XDP Modes on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the total user and system CPU usage using different XDP Modes on the AF\_XDP client with the "Dogecoin" setup.}
 	\label{fig:pidstat-stacked-plot-client}
 \end{figure}
 
@@ -108,7 +109,7 @@ An alternative, or complementary, explanation involves the NAPI\_POLL\_WEIGHT pa
 \begin{figure}
 	\centering
 	\includegraphics[width=.75\linewidth]{pics/dogecoin-batch-size.pdf}
-	\caption[Goodput vs RX Batch Size on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A Comparison of the goodput achieved using zero-copy mode with different RX batch sizes on the AF\_XDP client. Client and server nodes used \emph{Intel Xeon D-1518 @ 2.20GHz} CPUs with \emph{Intel X552 10 GbE SFP+} \ac{NIC}s.}
+	\caption[Goodput vs RX Batch Size on \texttt{AF\_XDP} Client with \texttt{ixgbe} Driver.]{A comparison of the goodput achieved with various RX batch sizes in AF\_XDP client's zero-copy mode, using the "Dogecoin" setup.}
 	\label{fig:xdp-batch-size}
 \end{figure}
 
@@ -121,13 +122,13 @@ In summary, despite expectations, the AF\_XDP datapath did not demonstrate super
 \begin{figure}
 	\centering
 	\includegraphics[width=.85\linewidth]{pics/network-stack-diff.pdf}
-	\caption[Userspace-NIC Timestamp Differences as Boxplots.]{Time differences between userspace and NIC hardware timestamps using the topology seen in Figure~\ref{fig:ptp-topology}.}
+	\caption[Userspace-NIC Timestamp Differences as Boxplots.]{Time differences between userspace and NIC hardware timestamps using boxplots and the topology seen in Figure~\ref{fig:ptp-topology}.}
 	\label{fig:network-stack-diff}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=.85\linewidth]{pics/ptp-log-cdf.pdf}
-	\caption[Userspace-NIC Timestamp Differences as a CDF Plot.]{Time differences between userspace and NIC hardware timestamps as a CDF plot.}
+	\caption[Userspace-NIC Timestamp Differences as a CDF Plot.]{Time differences between userspace and NIC hardware timestamps as a CDF plot. The data was generated from a single 128 MB file download test, producing approximately 100,000 packets for this graph. Figure~\ref{fig:network-stack-diff} is a different representation of the same data.}
 	\label{fig:ptp-log-cdf}
 \end{figure}
