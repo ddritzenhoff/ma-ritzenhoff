@@ -18,7 +18,7 @@ For the higher-powered \emph{AMD EPYC} CPUs, we used the \emph{Mellanox MT28908 
 
 \section{Integrating AF\_XDP into the QIR}
 \label{sec:msquic-extensions}
-MsQuic offers two build modes: Debug and Release. Debug mode includes extra features for diagnosing issues, while Release mode, which is designed for higher throughput, omits these. The following subsections detail the steps required to integrate both build modes with \ac{XDP} in the \ac{QIR}.
+MsQuic offers two build modes: Debug and Release. Debug mode includes extra features for diagnosing issues, while Release mode, which is designed for higher goodput, omits these. The following subsections detail the steps required to integrate both build modes with \ac{XDP} in the \ac{QIR}.
 
 Finally, unless mentioned otherwise, all modifications to MsQuic as part of this thesis were based off version 2.4.7\footnote{https://github.com/microsoft/msquic/pkgs/container/msquic\%2Fqns/317647544?tag=v2.4.7}. 
 
@@ -57,7 +57,7 @@ Although MsQuic provided support for \ac{XDP}, it did not have the logic integra
         printf("SetParam failed, 0x%x!\n", Status);
 \end{lstlisting}
 
-With \ac{XDP} now successfully loading, the next steps included enabling transmissions and optimizing the AF\_XDP socket and UMEM creation, as introduced in Section~\ref{sec:xdp}. With respect to enabling the transmissions, a peculiar bug emerged during the first throughput test. Namely, the \ac{XDP} program loaded correctly, yet failed to initiate transmissions. Using Wireshark\footnote{https://www.wireshark.org/} on the sniffer (depicted in Figure~\ref{fig:qir-topology}), we analyzed the client's outgoing packets. It became evident that the client was sending QUIC Initial packets with a destination MAC address of \texttt{00:00:00:00:00:00}. Since the server \ac{NIC} did not possess this physical address, it strongly suggested the \ac{XDP}-enabled client was unable to properly resolve the destination's MAC address.
+With \ac{XDP} now successfully loading, the next steps included enabling transmissions and optimizing the AF\_XDP socket and UMEM creation, as introduced in Section~\ref{sec:xdp}. With respect to enabling the transmissions, a peculiar bug emerged during the first goodput test. Namely, the \ac{XDP} program loaded correctly, yet failed to initiate transmissions. Using Wireshark\footnote{https://www.wireshark.org/} on the sniffer (depicted in Figure~\ref{fig:qir-topology}), we analyzed the client's outgoing packets. It became evident that the client was sending QUIC Initial packets with a destination MAC address of \texttt{00:00:00:00:00:00}. Since the server \ac{NIC} did not possess this physical address, it strongly suggested the \ac{XDP}-enabled client was unable to properly resolve the destination's MAC address.
 
 The solution involved correctly resolving the destination IP address (as shown in Listing~\ref{lst:ip-neigh}) and subsequently setting the corresponding MAC address in the Neighbor Table, which then allowed transmissions to proceed.
 
@@ -107,9 +107,9 @@ Thus, after two simple changes, we were rewarded with a drastic speed-up. The fi
 
 \subsection{MsQuic Release-Mode Goodput Test Failures}
 \label{subsec:spontaneous-test-failures}
-During the \ac{XDP} bring-up, we encountered an additional, perplexing bug. Occasionally, throughput tests using MsQuic Release-mode artifacts would fail. Compounding the issue, these failures produced no discernible error messages, leaving us with minimal diagnostic information. The only clue was that Debug-mode artifacts consistently ran without such failures.
+During the \ac{XDP} bring-up, we encountered an additional, perplexing bug. Occasionally, goodput tests using MsQuic Release-mode artifacts would fail. Compounding the issue, these failures produced no discernible error messages, leaving us with minimal diagnostic information. The only clue was that Debug-mode artifacts consistently ran without such failures.
 
-The key difference between Debug and Release modes lay in the Release build's leaner debug content, which resulted in slightly faster transmission times for the same file sizes. This seemingly minor detail ultimately proved to be the crux of the problem. Because the \ac{XDP} program in Release-mode was encountering packets at a higher rate, it was also consuming the Fill descriptors as described in Subsection~\ref{subsec:af-xdp-socket} at a higher rate. At certain throughput levels, these Fill descriptors were not replenished quickly enough, leading directly to packet loss. To address this, we increased the number of UMEM frames\footnote{\href{https://github.com/microsoft/msquic/blob/1160b80e09eda16d365b76491c798e9db9f47275/src/platform/datapath_raw_xdp_linux.c\#L30}{datapath\_raw\_xdp\_linux.c, Line 30}}. This ensured a larger pool of available descriptors, effectively accommodating the higher packet rates in MsQuic's Release mode.
+The key difference between Debug and Release modes lay in the Release build's leaner debug content, which resulted in slightly faster transmission times for the same file sizes. This seemingly minor detail ultimately proved to be the crux of the problem. Because the \ac{XDP} program in Release-mode was encountering packets at a higher rate, it was also consuming the Fill descriptors as described in Subsection~\ref{subsec:af-xdp-socket} at a higher rate. At certain goodput levels, these Fill descriptors were not replenished quickly enough, leading directly to packet loss. To address this, we increased the number of UMEM frames\footnote{\href{https://github.com/microsoft/msquic/blob/1160b80e09eda16d365b76491c798e9db9f47275/src/platform/datapath_raw_xdp_linux.c\#L30}{datapath\_raw\_xdp\_linux.c, Line 30}}. This ensured a larger pool of available descriptors, effectively accommodating the higher packet rates in MsQuic's Release mode.
 
 \subsection{Variation of Batch Sizes}
 \label{subsec:variation-of-batch-sizes}

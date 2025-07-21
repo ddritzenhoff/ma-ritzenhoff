@@ -16,7 +16,7 @@ Throughout the research for this thesis, we identified several promising ideas f
 
 \subsubsection{Enabling GRO within XDP}
 \label{subsubsec:enabling-gro-within-xdp}
-The performance advantages of \ac{GRO}, primarily its reduction of per-packet overhead within the Linux network stack (as shown in Subsection~\ref{subsec:xdp-on-the-client}), can be similarly extended to \ac{XDP}. As written in Bianconi et al.~\cite{xdp_multibuff_2019}, initial efforts towards this integration are already underway, and \ac{XDP} Fragments, which is a required component to support \ac{GRO} in \ac{XDP}, is gaining support across an increasing number of drivers~\cite{af_xdp_driver_support}. As seen in Figure~\ref{fig:dogecoin-client-throughput}, the difference between including and not including \ac{GRO} makes a dramatic impact to the default datapath, so the gains to \ac{XDP} could offer similar upside.
+The performance advantages of \ac{GRO}, primarily its reduction of per-packet overhead within the Linux network stack (as shown in Subsection~\ref{subsec:xdp-on-the-client}), can be similarly extended to \ac{XDP}. As written in Bianconi et al.~\cite{xdp_multibuff_2019}, initial efforts towards this integration are already underway, and \ac{XDP} Fragments, which is a required component to support \ac{GRO} in \ac{XDP}, is gaining support across an increasing number of drivers~\cite{af_xdp_driver_support}. As seen in Figure~\ref{fig:dogecoin-client-goodput}, the difference between including and not including \ac{GRO} makes a dramatic impact to the default datapath, so the gains to \ac{XDP} could offer similar upside.
 
 % \begin{figure}
 % 	\centering
@@ -31,7 +31,7 @@ One promising modification to MsQuic for improved transmit (TX) performance invo
 
 \subsubsection{Expanding \ac{NIC} Hardware Offloads}
 \label{subsubsec:encryption-hw-offload}
-As highlighted by Jaeger et al.~\cite{quic_on_the_highway}, encryption and decryption are the second largest consumers of CPU resources after packet I/O. Consequently, enabling hardware offload for these tasks would significantly impact performance. MsQuic is currently focused on enabling such offload capabilities\footnote{https://github.com/microsoft/msquic/issues/4780}, with a proposal already describing the necessary steps for hardware vendors to offer support\footnote{https://github.com/microsoft/net-offloads/blob/main/quic-encryption-offload.md}. Exploring this area could thus be a valid approach to improving throughput.
+As highlighted by Jaeger et al.~\cite{quic_on_the_highway}, encryption and decryption are the second largest consumers of CPU resources after packet I/O. Consequently, enabling hardware offload for these tasks would significantly impact performance. MsQuic is currently focused on enabling such offload capabilities\footnote{https://github.com/microsoft/msquic/issues/4780}, with a proposal already describing the necessary steps for hardware vendors to offer support\footnote{https://github.com/microsoft/net-offloads/blob/main/quic-encryption-offload.md}. Exploring this area could thus be a valid approach to improving goodput.
 
 Finally, as detailed in Yang et al.~\cite{10.1145/3405796.3405827}, hardware offloading can be pushed yet even further to also include features such as packet reordering and checksum offloading. Fundamentally, the more work a \ac{NIC} takes off the CPU, the more cycles the CPU will have for other processes.
 
