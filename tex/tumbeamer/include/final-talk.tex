@@ -1,16 +1,33 @@
+% • Problem and motivation of the work (rather short repetition)
+% • Research questions (rather short repetition)
+% • Problem analysis (rather short repetition)
+% • Approach and solution to the problem
+% • Evaluation of the solution
+% • Distinction from and advancement beyond related work
+% • Final conclusion
+
 \section{Motivation}
 \begin{frame}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.95\textwidth]{pics/http3-usage-cloudflare.png}
+    \end{figure}
     \begin{itemize}
-        \item HTTP/3 commands \textasciitilde20\% of internet traffic worldwide\footnote{https://radar.cloudflare.com/year-in-review/2024\#http-versions}\nocite{cloudflare2024}
-        \item Uses QUIC as its L4 protocol
+        \item Roughly 20\% of the world's internet traffic now runs on HTTP/3, the protocol built on QUIC\footnote{https://radar.cloudflare.com/year-in-review/2024\#http-versions}\nocite{cloudflare2024}
         \item QUIC throughput is not able to match TCP with increasing bandwidth\footnote{Zhang et al., Quic is not quick enough over fast internet, WWW ’24, pp. 2713–2722}\nocite{Zhang_2024}
         \item Packet I/O is QUIC's largest bottleneck in terms of its maximum achievable throughput\footnote{Jaeger et al., Quic on the highway, June 2023, pp. 1–9.}\nocite{quic_on_the_highway}
     \end{itemize}
     \textbf{XDP offers a remedy}
-    \begin{figure}
-        \centering
-        \includegraphics[width=.5\textwidth]{pics/quic-stack.pdf}
-    \end{figure}
+\end{frame}
+
+\section{Research Questions}
+\begin{frame}
+    \begin{itemize}
+        \item To what extent can we increase QUIC performance by using XDP in a trivial way? Is there optimization potential?
+    \end{itemize}
+    \begin{itemize}
+        \item Can a taxonomy be created for QUIC optimizations, categorizing them by implementation complexity, performance improvement potential, unwanted side effects, privilege level usage, and deployment?
+    \end{itemize}
 \end{frame}
 
 % - Start off by talking about motiviation
@@ -28,7 +45,7 @@
     \end{itemize}
     \begin{figure}
         \centering
-        \includegraphics[width=.75\textwidth]{pics/xdp_hook_points.pdf}
+        \includegraphics[width=.90\textwidth]{pics/xdp-actions2.pdf}
     \end{figure}
 \end{frame}
 
@@ -44,7 +61,7 @@
     \end{itemize}
     \begin{figure}
         \centering
-        \includegraphics[width=.75\textwidth]{pics/af_xdp_diagram.jpeg}
+        \includegraphics[width=.90\textwidth]{pics/xdp-actions-af-xdp.pdf}
         \nocite{af_xdp_image}
         \label{fig1}
     \end{figure}
@@ -75,10 +92,42 @@
 
 \section{Additional Optimizations}
 \begin{frame}
-    \frametitle{GSO and sendmmsg(2)}
+    \frametitle{recvmmsg(2)}
     \begin{figure}
         \centering
-        \includegraphics[width=.90\textwidth]{pics/sendmmsg(2)_GSO_explanation.pdf}
+        \includegraphics[width=.90\textwidth]{pics/diag-recvfrom(2)v2.pdf}
+    \end{figure}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.90\textwidth]{pics/diag-recvmmsg(2)v2.pdf}
+    \end{figure}
+
+\end{frame}
+
+\section{Additional Optimizations}
+\begin{frame}
+    \frametitle{Generic Receive Offload (GRO)}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.90\textwidth]{pics/diag-recvfrom(2)v2.pdf}
+    \end{figure}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.90\textwidth]{pics/diag-grov2.pdf}
+    \end{figure}
+\end{frame}
+
+\section{Additional Optimizations}
+\begin{frame}
+    \frametitle{recvmmsg(2) + GRO}
+    \begin{itemize}
+        \item recvmmsg(2) system call receives multiple messages from a socket in a single call, which can be more efficient than making multiple recvfrom(2) calls.
+        \item GRO combines network packets into a single larger one, reducing the number of packets the CPU has to process
+        \item A similar optimization exists for sending
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.90\textwidth]{pics/diag-recvmmsg(2)+grov2.pdf}
     \end{figure}
 \end{frame}
 
@@ -88,11 +137,12 @@
         \item Patch MsQuic\footnote{https://github.com/microsoft/msquic} to support AF\_XDP
         \item Run throughput tests in a client-server topology
         \item 20 iterations with 8GB file size
+        \item Dogecoin: Intel Xeon D-1518 @ 2.20GHz 4-core CPU with 32 GB of RAM with Intel X552 10 GbE SFP+ NICs and ixgbe driver version 6.1.0-17-amd64. Over a 10 Gbase link.
+        \item Opulous: AMD EPYC 9354 @ 3.25 GHz 32-core CPU with 768 GB of RAM with Mellanox MT28908 ConnectX-6 NICs and mlx5\_core driver version 6.1.0-17-amd64. Over a 100 Gbase link.
     \end{itemize}
     \begin{figure}
         \centering
-        \includegraphics[width=.75\textwidth]{pics/network-topology.png}
-        \nocite{network-topology}
+        \includegraphics[width=.75\textwidth]{pics/throughput-topology.pdf}
         \label{fig3}
     \end{figure}
 \end{frame}
