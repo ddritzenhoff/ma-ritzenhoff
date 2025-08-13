@@ -15,7 +15,7 @@
     \begin{itemize}
         \item Roughly 20\% of the world's internet traffic now runs on HTTP/3, the protocol built on QUIC\footnote{https://radar.cloudflare.com/year-in-review/2024\#http-versions}\nocite{cloudflare2024}
         \item QUIC throughput is not able to match TCP with increasing bandwidth\footnote{Zhang et al., Quic is not quick enough over fast internet, WWW ’24, pp. 2713–2722}\nocite{Zhang_2024}
-        \item Packet I/O is QUIC's largest bottleneck in terms of its maximum achievable throughput\footnote{Jaeger et al., Quic on the highway, June 2023, pp. 1–9.}\nocite{quic_on_the_highway}
+        \item Packet I/O is QUIC's largest bottleneck in terms of its maximum achievable goodput\footnote{Jaeger et al., Quic on the highway, June 2023, pp. 1–9.}\nocite{quic_on_the_highway}
     \end{itemize}
     \textbf{XDP offers a remedy}
 \end{frame}
@@ -123,7 +123,7 @@
     \begin{itemize}
         \item recvmmsg(2) system call receives multiple messages from a socket in a single call, which can be more efficient than making multiple recvfrom(2) calls.
         \item GRO combines network packets into a single larger one, reducing the number of packets the CPU has to process
-        \item A similar optimization exists for sending
+        \item A similar optimization exists for sending (i.e. GSO)
     \end{itemize}
     \begin{figure}
         \centering
@@ -133,18 +133,176 @@
 
 \section{Approach}
 \begin{frame}
+    \frametitle{Throughput}
     \begin{itemize}
         \item Patch MsQuic\footnote{https://github.com/microsoft/msquic} to support AF\_XDP
         \item Run throughput tests in a client-server topology
-        \item 20 iterations with 8GB file size
-        \item Dogecoin: Intel Xeon D-1518 @ 2.20GHz 4-core CPU with 32 GB of RAM with Intel X552 10 GbE SFP+ NICs and ixgbe driver version 6.1.0-17-amd64. Over a 10 Gbase link.
-        \item Opulous: AMD EPYC 9354 @ 3.25 GHz 32-core CPU with 768 GB of RAM with Mellanox MT28908 ConnectX-6 NICs and mlx5\_core driver version 6.1.0-17-amd64. Over a 100 Gbase link.
+        \item 20 iterations with 8GB file size using Dogecoin\footnote{Dogecoin: \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU, 32 GB of RAM, and \emph{Intel X552 10 GbE SFP+} NICs, using \emph{ixgbe driver} (version 6.1.0-17-amd64) over a 10 Gbase link.} and Opulous\footnote{Opulous: \emph{AMD EPYC 9354 @ 3.25 GHz 32-core} CPU, 768 GB of RAM, and \emph{Mellanox MT28908 ConnectX-6} NICs, using \emph{mlx5\_core driver} (version 6.1.0-17-amd64) over a 100 Gbase link.} testbeds.
     \end{itemize}
     \begin{figure}
         \centering
         \includegraphics[width=.75\textwidth]{pics/throughput-topology.pdf}
         \label{fig3}
     \end{figure}
+\end{frame}
+
+\section{XDP Types}
+\begin{frame}
+    \frametitle{XDP\_SKB}
+    \begin{itemize}
+        \item Point 1
+        \item Point 2
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/skb-mode.pdf}
+    \end{figure}
+\end{frame}
+
+\section{XDP Types}
+\begin{frame}
+    \frametitle{XDP\_DRV}
+    \begin{itemize}
+        \item Point 1
+        \item Point 2
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/no-xdp-zerocopy.pdf}
+    \end{figure}
+\end{frame}
+
+\section{XDP Types}
+\begin{frame}
+    \frametitle{XDP\_DRV with Zero-Copy (zc)}
+    \begin{itemize}
+        \item Point 1
+        \item Point 2
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/xdp-zerocopy.pdf}
+    \end{figure}
+\end{frame}
+
+\section{Measurements}
+\begin{frame}
+    \frametitle{AF\_XDP on the Server (Dogecoin)}
+    \begin{itemize}
+        \item Point 1
+        \item Point 2
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/dogecoin-server-goodput.pdf}
+        \label{fig4}
+    \end{figure}
+\end{frame}
+
+\section{Measurements}
+\begin{frame}
+    \frametitle{AF\_XDP on the Server, continued}
+    \begin{itemize}
+        \item Point 1
+        \item Point 2
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/pidstat-stacked-plot-server.pdf}
+    \end{figure}
+\end{frame}
+
+\section{Measurements}
+\begin{frame}
+    \frametitle{AF\_XDP on the Client (Dogecoin)}
+    \begin{itemize}
+        \item Point 1
+        \item Point 2
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/dogecoin-client-goodput.pdf}
+        \label{fig5}
+    \end{figure}
+\end{frame}
+
+\section{Measurements}
+\begin{frame}
+    \frametitle{RX Batch Sizes with AF\_XDP on the Client (Dogecoin)}
+    \begin{itemize}
+        \item Point 1
+        \item Point 2
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/dogecoin-batch-size.pdf}
+        \label{fig6}
+    \end{figure}
+\end{frame}
+
+\section{Approach}
+\begin{frame}
+    \frametitle{NIC-to-Userspace Packet Traversal Time}
+    \begin{itemize}
+        \item Sync NICs and system times using Precision Time Protocol (PTP)\footnote{https://github.com/richardcochran/linuxptp}
+        \item 1 iteration with 128MB file size using Dogecoin\footnote{Dogecoin: \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU, 32 GB of RAM, and \emph{Intel X552 10 GbE SFP+} NICs, using \emph{ixgbe driver} (version 6.1.0-17-amd64) over a 10 Gbase link.}
+        \item Generates more than 100k NIC-to-Userspace packet time differences
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/ptp-topology2.pdf}
+        \label{fig3}
+    \end{figure}
+\end{frame}
+
+\section{Measurements}
+\begin{frame}
+    \begin{itemize}
+        \item Point 1
+        \item Point 2
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/ptp-log-cdf.pdf}
+    \end{figure}
+\end{frame}
+
+\section{Related Work}
+\begin{frame}
+    \begin{itemize}
+        \item DPDK\footnote{https://www.dpdk.org/}\nocite{dpdk} enables kernel bypass and allows application to connect directly to the NIC, reducing kernel overhead
+        \item lxin-quic\footnote{https://github.com/lxin/quic}\nocite{lxin_quic} brings QUIC into the kernel, reducing context switches and copying between kernel and userspace
+        \item \textit{QUIC Performance Improvements Using Socket Optimizations and Kernel Bypass}\footnote{Späth, J. QUIC performance improvements using socket optimizations and kernel bypass. Master’s thesis, TU Munich, 2023.}\nocite{spaeth2023} investigates methods to improve QUIC performance by means
+        of patching MsQuic with DPDK and using socket optimizations
+    \end{itemize}
+    % \begin{figure}
+    %     \centering
+    %     \includegraphics[width=.75\textwidth]{pics/dpdk.png}
+    %     \label{fig81}
+    %     \nocite{donato2018dpdk}
+    % \end{figure}
+\end{frame}
+
+\section{Taxonomy of QUIC Datapaths}
+\begin{frame}
+    \begin{table}[h]
+    \small
+    \centering
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Metric} & \textbf{DPDK} & \textbf{AF\_XDP} & \textbf{In-kernel QUIC} & \textbf{GSO/GRO} \\
+        \midrule
+        \textbf{Impl. Complexity} & High & High & High & Low \\
+        \textbf{Standardized APIs} & \no & \no & \yes & \yes \\
+        \textbf{Kernel Integration} & Low & Medium & High & High \\
+        \textbf{NIC Sharing} & \no & \yes & \yes & \yes \\
+        \textbf{Hardware Agnostic} & Low & High* & High & High \\
+        \textbf{Maturity} & High & Medium & Low & High\\
+        \textbf{Tooling} & Medium & High & High & High \\
+        \textbf{Privileged Access} & \yes & \yes & \yes & \yes \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 \end{frame}
 
 % \section{Optimization}
@@ -166,58 +324,6 @@
 %     \end{figure}
 % \end{frame}
 
-\section{Measurements}
-\begin{frame}
-    \begin{itemize}
-        \item Start with baseline MsQuic datapath (recvmmsg+GRO)
-        \item Switch datapath to AF\_XDP XDP\_SKB mode
-    \end{itemize}
-    \begin{figure}
-        \centering
-        \includegraphics[width=.75\textwidth]{pics/two_dogecoin.pdf}
-        \label{fig4}
-    \end{figure}
-\end{frame}
-
-\section{Measurements}
-\begin{frame}
-    \begin{itemize}
-        \item Move the XDP hook point closer to the driver with XDP\_DRV
-        \item No longer constructing sk\_buffs, so ideally less overhead per packet
-    \end{itemize}
-    \begin{figure}
-        \centering
-        \includegraphics[width=.75\textwidth]{pics/three_dogecoin.pdf}
-        \label{fig5}
-    \end{figure}
-\end{frame}
-
-\section{Measurements}
-\begin{frame}
-    \begin{itemize}
-        \item Eliminate an unnecessary additional copy to userspace with XDP\_ZEROCOPY
-        \item NIC now DMAs packet directly into UMEM frame
-    \end{itemize}
-    \begin{figure}
-        \centering
-        \includegraphics[width=.75\textwidth]{pics/four_dogecoin.pdf}
-        \label{fig6}
-    \end{figure}
-\end{frame}
-
-\section{Measurements}
-\begin{frame}
-    \begin{itemize}
-        \item GRO is the main reason the default datapath is so fast
-        \item Can we use GRO with XDP?
-    \end{itemize}
-    \begin{figure}
-        \centering
-        \includegraphics[width=.75\textwidth]{pics/five_dogecoin.pdf}
-        \label{fig7}
-    \end{figure}
-\end{frame}
-
 % \section{GRO for XDP}
 % \begin{frame}
 %     \begin{itemize}
@@ -231,44 +337,48 @@
 %     \end{figure}
 % \end{frame}
 
-\section{Related Work}
-\begin{frame}
-    \begin{itemize}
-        \item DPDK\footnote{https://www.dpdk.org/}\nocite{dpdk} enables kernel bypass and allows application to connect directly to the NIC, reducing kernel overhead
-        \item lxin-quic\footnote{https://github.com/lxin/quic}\nocite{lxin_quic} brings QUIC into the kernel, reducing context switches and copying between kernel and userspace
-        \item \textit{QUIC Performance Improvements Using Socket Optimizations and Kernel Bypass}\footnote{Späth, J. QUIC performance improvements using socket optimizations and kernel bypass. Master’s thesis, TU Munich, 2023.}\nocite{spaeth2023} investigates methods to improve QUIC performance by means
-        of patching MsQuic with DPDK and using socket optimizations
-    \end{itemize}
-    % \begin{figure}
-    %     \centering
-    %     \includegraphics[width=.75\textwidth]{pics/dpdk.png}
-    %     \label{fig81}
-    %     \nocite{donato2018dpdk}
-    % \end{figure}
-\end{frame}
-
 \section{Conclusion}
 \begin{frame}
     \begin{itemize}
-        \item AF\_XDP is not able to achieve a higher throughput over recvmmsg()+GRO
-        \item XDP fragmentation support enables AF\_XDP+GRO to potentially further increase performance
-        \item AF\_XDP represents one of many methods to reduce packet IO, each with its strengths and weaknesses
+        \item To what extent can we increase QUIC performance by using XDP in a trivial way? Is there optimization potential?
+        \begin{itemize}
+            \item AF\_XDP is not able to achieve a higher goodput over recvmmsg()+GRO
+            \item test 2
+        \end{itemize}
+    \end{itemize}
+    \begin{itemize}
+        \item Can a taxonomy be created for QUIC optimizations, categorizing them by implementation complexity, performance improvement potential, unwanted side effects, privilege level usage, and deployment?
+        \begin{itemize}
+            \item test 3
+        \end{itemize}
     \end{itemize}
 \end{frame}
 
 \section{Next Steps}
 \begin{frame}
     \begin{itemize}
-        \item Investigate AF\_XDP latency with clock-sychronized splitter and client to measure packet latency based on timing of arrived packets
-        \item Create taxonomy for QUIC optimizations in terms of implementation complexity, performance improvement potential, unwanted side effects, flexibility, privilege level usage, and dynamic vs. static loading
+        \item Enable GRO for AF\_XDP, for which driver support has been increasing~\cite{xdp_multibuff_2019}
+        \item Increase the TX ring batch size from its default of 1, which may offer similar speedups as seen in the RX batch size case
     \end{itemize}
+\end{frame}
+
+\section{Appendix}
+\begin{frame}
+    \frametitle{AF\_XDP on the Server (Opulous)}
     \begin{figure}
         \centering
-        \includegraphics[width=.85\textwidth]{pics/latency_topology.pdf}
-        \label{fig9}
+        \includegraphics[width=.75\textwidth]{pics/opulous-server-goodput.pdf}
     \end{figure}
 \end{frame}
 
+\section{Appendix}
+\begin{frame}
+    \frametitle{AF\_XDP on the Client (Opulous)}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/opulous-client-goodput.pdf}
+    \end{figure}
+\end{frame}
 
 % \section{FEC Primer}
 % \begin{frame}
