@@ -123,7 +123,7 @@
     \begin{itemize}
         \item recvmmsg(2) system call receives multiple messages from a socket in a single call, which can be more efficient than making multiple recvfrom(2) calls.
         \item GRO combines network packets into a single larger one, reducing the number of packets the CPU has to process
-        \item A similar optimization exists for sending (i.e. GSO)
+        \item A similar optimization exists for sending (i.e. GSO and sendmmsg(2))
     \end{itemize}
     \begin{figure}
         \centering
@@ -146,12 +146,24 @@
     \end{figure}
 \end{frame}
 
+\section{XDP Hook Points}
+\begin{frame}
+    \begin{itemize}
+        \item Two different XDP hook points: \texttt{XDP\_DRV} and \texttt{XDP\_SKB}
+        \item \texttt{XDP\_SKB} requires additional processing over \texttt{XDP\_DRV}
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/xdp-receive-path3.pdf}
+    \end{figure}
+\end{frame}
+
 \section{XDP Types}
 \begin{frame}
     \frametitle{XDP\_SKB}
     \begin{itemize}
-        \item Point 1
-        \item Point 2
+        \item Packet is copied by NIC into kernel memory and an sk\_buff is allocated
+        \item Packet is copied from kernel memory into the UMEM region
     \end{itemize}
     \begin{figure}
         \centering
@@ -163,8 +175,8 @@
 \begin{frame}
     \frametitle{XDP\_DRV}
     \begin{itemize}
-        \item Point 1
-        \item Point 2
+        \item Packet is copied by NIC into kernel memory; no sk\_buff this time
+        \item Packet is copied from kernel memory into the UMEM region 
     \end{itemize}
     \begin{figure}
         \centering
@@ -176,8 +188,8 @@
 \begin{frame}
     \frametitle{XDP\_DRV with Zero-Copy (zc)}
     \begin{itemize}
-        \item Point 1
-        \item Point 2
+        \item Packet is copied by NIC directly into UMEM region; an additional copy is therefore completely avoided
+        \item A similar process exists for sending 
     \end{itemize}
     \begin{figure}
         \centering
@@ -189,8 +201,8 @@
 \begin{frame}
     \frametitle{AF\_XDP on the Server (Dogecoin)}
     \begin{itemize}
-        \item Point 1
-        \item Point 2
+        \item \texttt{XDP\_DRV+zc} exhibits higher goodput than substitutes but remains lower than \texttt{sendmmsg+GSO}
+        \item \texttt{GSO} makes the difference within the default datapath
     \end{itemize}
     \begin{figure}
         \centering
@@ -203,8 +215,8 @@
 \begin{frame}
     \frametitle{AF\_XDP on the Server, continued}
     \begin{itemize}
-        \item Point 1
-        \item Point 2
+        \item System CPU usage for \texttt{XDP\_SKB} and \texttt{XDP\_DRV} higher than \texttt{XDP\_DRV+zc}
+        \item We used a perf trace to pinpoint the increased time spent copying data from the UMEM to kernel memory
     \end{itemize}
     \begin{figure}
         \centering
@@ -216,8 +228,8 @@
 \begin{frame}
     \frametitle{AF\_XDP on the Client (Dogecoin)}
     \begin{itemize}
-        \item Point 1
-        \item Point 2
+        \item Surprisingly, the XDP alternatives are no longer statistically significant from each other
+        \item Talk about large \texttt{XDP\_SKB} std dev. here?
     \end{itemize}
     \begin{figure}
         \centering
@@ -230,8 +242,8 @@
 \begin{frame}
     \frametitle{RX Batch Sizes with AF\_XDP on the Client (Dogecoin)}
     \begin{itemize}
-        \item Point 1
-        \item Point 2
+        \item Goodput increases as RX batch size increases until 32
+        \item The bottleneck changes; MsQuic must no longer wait for packets and instead spends its time on processing
     \end{itemize}
     \begin{figure}
         \centering
@@ -258,8 +270,8 @@
 \section{Measurements}
 \begin{frame}
     \begin{itemize}
-        \item Point 1
-        \item Point 2
+        \item XDP and default datapath NIC-to-userspace times mostly remain in parity
+        \item The long tail in the non-XDP case is likely due to additional queues in the receive path
     \end{itemize}
     \begin{figure}
         \centering
@@ -283,6 +295,14 @@
     % \end{figure}
 \end{frame}
 
+\section{QUIC Datapaths}
+\begin{frame}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.90\textwidth]{pics/QUIC-datapaths.pdf}
+    \end{figure}
+\end{frame}
+
 \section{Taxonomy of QUIC Datapaths}
 \begin{frame}
     \begin{table}[h]
@@ -290,15 +310,15 @@
     \centering
     \begin{tabular}{lcccc}
         \toprule
-        \textbf{Metric} & \textbf{DPDK} & \textbf{AF\_XDP} & \textbf{In-kernel QUIC} & \textbf{GSO/GRO} \\
+        \textbf{Metric} & \textbf{GSO/GRO} & \textbf{AF\_XDP} & \textbf{In-kernel QUIC} & \textbf{DPDK} \\
         \midrule
-        \textbf{Impl. Complexity} & High & High & High & Low \\
-        \textbf{Standardized APIs} & \no & \no & \yes & \yes \\
-        \textbf{Kernel Integration} & Low & Medium & High & High \\
-        \textbf{NIC Sharing} & \no & \yes & \yes & \yes \\
-        \textbf{Hardware Agnostic} & Low & High* & High & High \\
+        \textbf{Impl. Complexity} & Low & High & High & High \\
+        \textbf{Standardized APIs} & \yes & \no & \yes & \no \\
+        \textbf{Kernel Integration} & High & Medium & High & Low \\
+        \textbf{NIC Sharing} & \yes & \yes & \yes & \no \\
+        \textbf{Hardware Agnostic} & High & High* & High & Low \\
         \textbf{Maturity} & High & Medium & Low & High\\
-        \textbf{Tooling} & Medium & High & High & High \\
+        \textbf{Tooling} & High & High & High & Medium \\
         \textbf{Privileged Access} & \yes & \yes & \yes & \yes \\
         \bottomrule
     \end{tabular}
@@ -343,13 +363,14 @@
         \item To what extent can we increase QUIC performance by using XDP in a trivial way? Is there optimization potential?
         \begin{itemize}
             \item AF\_XDP is not able to achieve a higher goodput over recvmmsg()+GRO
-            \item test 2
+            \item AF\_XDP NIC-to-userspace times remain consistent with the default datapath
+            \item However, optimization potential exists
         \end{itemize}
     \end{itemize}
     \begin{itemize}
         \item Can a taxonomy be created for QUIC optimizations, categorizing them by implementation complexity, performance improvement potential, unwanted side effects, privilege level usage, and deployment?
         \begin{itemize}
-            \item test 3
+            \item Yes, each datapath offers its unique set of tradeoffs
         \end{itemize}
     \end{itemize}
 \end{frame}
@@ -359,6 +380,7 @@
     \begin{itemize}
         \item Enable GRO for AF\_XDP, for which driver support has been increasing~\cite{xdp_multibuff_2019}
         \item Increase the TX ring batch size from its default of 1, which may offer similar speedups as seen in the RX batch size case
+        \item Perform throughput and latency measurements across all QUIC datapaths on the same testbed
     \end{itemize}
 \end{frame}
 
