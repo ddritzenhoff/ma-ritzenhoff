@@ -15,9 +15,12 @@
     \begin{itemize}
         \item Roughly 20\% of the world's internet traffic now runs on HTTP/3, the protocol built on QUIC\footnote{https://radar.cloudflare.com/year-in-review/2024\#http-versions}\nocite{cloudflare2024}
         \item QUIC throughput is not able to match TCP with increasing bandwidth\footnote{Zhang et al., Quic is not quick enough over fast internet, WWW ’24, pp. 2713–2722}\nocite{Zhang_2024}
-        \item Packet I/O is QUIC's largest bottleneck in terms of its maximum achievable goodput\footnote{Jaeger et al., Quic on the highway, June 2023, pp. 1–9.}\nocite{quic_on_the_highway}
+        \item Packet I/O is the largest bottleneck for major QUIC implementations in terms of its maximum achievable goodput\footnote{Jaeger et al., Quic on the highway, June 2023, pp. 1–9.}\nocite{quic_on_the_highway}
+        \item Work has been done to address this bottleneck: DPDK, Linux-in-QUIC, and Generic Receive Offload (GRO) with Generic Segmentation Offload (GSO).
     \end{itemize}
-    \textbf{XDP offers a remedy}
+    \begin{center}
+        \textbf{XDP offers an additional approach}
+    \end{center}
 \end{frame}
 
 \section{Research Questions}
@@ -26,7 +29,14 @@
         \item To what extent can we increase QUIC performance by using XDP in a trivial way? Is there optimization potential?
     \end{itemize}
     \begin{itemize}
-        \item Can a taxonomy be created for QUIC optimizations, categorizing them by implementation complexity, performance improvement potential, unwanted side effects, privilege level usage, and deployment?
+    \item Can a taxonomy be created for QUIC optimizations, categorized by:
+        \begin{itemize}
+            \item Implementation complexity
+            \item Performance improvement potential
+            \item Unwanted side effects
+            \item Privilege level usage
+            \item Deployment
+        \end{itemize}
     \end{itemize}
 \end{frame}
 
@@ -70,16 +80,13 @@
 \section{AF\_XDP Primer}
 \begin{frame}
     \begin{itemize}
-        \item AF\_XDP uses UMEM with tx, rx, completion, and fill rings
-        \item Each ring is single producer, single consumer
-        \item Avoids locking contention
-        \item Need a single system call to trigger multi-packet sends
+        \item UMEM is a data buffer in userspace memory; it stores packets
+        \item Packets be directly copied into the UMEM from the NIC (i.e. zero-copy or zc)
+        \item Alternatively, packets can be copied into kernel memory first and later into the UMEM
     \end{itemize}
     \begin{figure}
         \centering
-        \includegraphics[width=.75\textwidth]{pics/umem.png}
-        \nocite{cloudflare_af_xdp_cookie}
-        \label{fig2}
+        \includegraphics[width=.90\textwidth]{pics/UMEM-region.pdf}
     \end{figure}
 \end{frame}
 
@@ -120,25 +127,36 @@
 
 \section{Additional Optimizations}
 \begin{frame}
-    \frametitle{recvmmsg(2) + GRO}
-    \begin{itemize}
-        \item recvmmsg(2) system call receives multiple messages from a socket in a single call, which can be more efficient than making multiple recvfrom(2) calls.
-        \item GRO combines network packets into a single larger one, reducing the number of packets the CPU has to process
-        \item A similar optimization exists for sending (i.e. GSO and sendmmsg(2))
-    \end{itemize}
+    \frametitle{GRO + recvmmsg(2)}
     \begin{figure}
         \centering
         \includegraphics[width=.90\textwidth]{pics/diag-recvmmsg(2)+grov2.pdf}
     \end{figure}
+    \pause
+    \begin{itemize}
+        \item A similar optimization exists for sending:
+        \begin{itemize}
+            \item Generic Segmentation Offload (GSO)
+            \item sendmmsg(2)
+        \end{itemize}
+    \end{itemize}
 \end{frame}
+
+% \item recvmmsg(2) system call receives multiple messages from a socket in a single call, which can be more efficient than making multiple recvfrom(2) calls.
+% \item GRO combines network packets into a single larger one, reducing the number of packets the CPU has to process
+
 
 \section{Approach}
 \begin{frame}
-    \frametitle{Throughput}
+    \frametitle{Goodput}
     \begin{itemize}
         \item Patch MsQuic\footnote{https://github.com/microsoft/msquic} to support AF\_XDP
         \item Run throughput tests in a client-server topology
-        \item 20 iterations with 8GB file size using Dogecoin\footnote{Dogecoin: \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU, 32 GB of RAM, and \emph{Intel X552 10 GbE SFP+} NICs, using \emph{ixgbe driver} (version 6.1.0-17-amd64) over a 10 Gbase link.} and Opulous\footnote{Opulous: \emph{AMD EPYC 9354 @ 3.25 GHz 32-core} CPU, 768 GB of RAM, and \emph{Mellanox MT28908 ConnectX-6} NICs, using \emph{mlx5\_core driver} (version 6.1.0-17-amd64) over a 100 Gbase link.} testbeds.
+        \item 20 iterations with 8GB file size using weak (Dogecoin) and strong (Opulous) CPU setups:
+        \begin{itemize}
+            \item Dogecoin: \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU, 32 GB of RAM, and \emph{Intel X552 10 GbE SFP+} NICs, using \emph{ixgbe driver} (version 6.1.0-17-amd64) over a 10 Gbase link.
+            \item Opulous: \emph{AMD EPYC 9354 @ 3.25 GHz 32-core} CPU, 768 GB of RAM, and \emph{Mellanox MT28908 ConnectX-6} NICs, using \emph{mlx5\_core driver} (version 6.1.0-17-amd64) over a 100 Gbase link.
+        \end{itemize}        
     \end{itemize}
     \begin{figure}
         \centering
@@ -161,36 +179,11 @@
 
 \section{XDP Types}
 \begin{frame}
-    \frametitle{XDP\_SKB}
     \begin{itemize}
-        \item Packet is copied by NIC into kernel memory and an sk\_buff is allocated
-        \item Packet is copied from kernel memory into the UMEM region
-    \end{itemize}
-    \begin{figure}
-        \centering
-        \includegraphics[width=.75\textwidth]{pics/skb-mode.pdf}
-    \end{figure}
-\end{frame}
-
-\section{XDP Types}
-\begin{frame}
-    \frametitle{XDP\_DRV}
-    \begin{itemize}
-        \item Packet is copied by NIC into kernel memory; no sk\_buff this time
-        \item Packet is copied from kernel memory into the UMEM region 
-    \end{itemize}
-    \begin{figure}
-        \centering
-        \includegraphics[width=.75\textwidth]{pics/no-xdp-zerocopy.pdf}
-    \end{figure}
-\end{frame}
-
-\section{XDP Types}
-\begin{frame}
-    \frametitle{XDP\_DRV with Zero-Copy (zc)}
-    \begin{itemize}
-        \item Packet is copied by NIC directly into UMEM region; an additional copy is therefore completely avoided
-        \item A similar process exists for sending 
+        \item Three XDP types: \texttt{XDP\_SKB}, \texttt{XDP\_DRV}, and \texttt{XDP\_DRV+zc} (i.e. zero-copy)
+        \item For \texttt{XDP\_DRV+zc}, packet is copied by NIC directly into UMEM region
+        \item For \texttt{XDP\_SKB} and \texttt{XDP\_DRV}, an intermediate copy into kernel memory is required
+        \item A similar process exists for sending
     \end{itemize}
     \begin{figure}
         \centering
@@ -400,6 +393,32 @@
     \begin{figure}
         \centering
         \includegraphics[width=.75\textwidth]{pics/opulous-client-goodput.pdf}
+    \end{figure}
+\end{frame}
+
+\section{Appendix}
+\begin{frame}
+    \frametitle{XDP Types: XDP\_SKB}
+    \begin{itemize}
+        \item Packet is copied by NIC into kernel memory and an sk\_buff is allocated
+        \item Packet is copied from kernel memory into the UMEM region
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/skb-mode.pdf}
+    \end{figure}
+\end{frame}
+
+\section{Appendix}
+\begin{frame}
+    \frametitle{XDP Types: XDP\_DRV}
+    \begin{itemize}
+        \item Packet is copied by NIC into kernel memory; no sk\_buff this time
+        \item Packet is copied from kernel memory into the UMEM region 
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/no-xdp-zerocopy.pdf}
     \end{figure}
 \end{frame}
 

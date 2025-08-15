@@ -175,6 +175,10 @@
 %\setbeamertemplate{itemize items}[circle]
 \setbeamertemplate{itemize items}{\raisebox{.1em}{$\bullet$}}
 
+% Keep the font size consistent
+\setbeamerfont{itemize/enumerate subbody}{size=\normalsize}
+\setbeamerfont{itemize/enumerate subsubbody}{size=\normalsize}
+
 \setbeamertemplate{frametitle}{\insertframetitle}
 \setbeamertemplate{framesubtitle}{\insertframesubtitle}
 
