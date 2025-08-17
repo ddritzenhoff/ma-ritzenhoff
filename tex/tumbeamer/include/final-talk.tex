@@ -154,8 +154,8 @@
         \item Run throughput tests in a client-server topology
         \item 20 iterations with 8GB file size using weak (Dogecoin) and strong (Opulous) CPU setups:
         \begin{itemize}
-            \item Dogecoin: \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU, 32 GB of RAM, and \emph{Intel X552 10 GbE SFP+} NICs, using \emph{ixgbe driver} (version 6.1.0-17-amd64) over a 10 Gbase link.
-            \item Opulous: \emph{AMD EPYC 9354 @ 3.25 GHz 32-core} CPU, 768 GB of RAM, and \emph{Mellanox MT28908 ConnectX-6} NICs, using \emph{mlx5\_core driver} (version 6.1.0-17-amd64) over a 100 Gbase link.
+            \item Dogecoin: \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU, 32 GB of RAM, and \emph{Intel X552 10 GbE SFP+} NICs, over a 10G link\footnote{Additionally, ixgbe driver (version 6.1.0-17-amd64) was used}
+            \item Opulous: \emph{AMD EPYC 9354 @ 3.25 GHz 32-core} CPU, 768 GB of RAM, and \emph{Mellanox ConnectX-6} NICs over a 100G link\footnote{Additionally, mlx5\_core driver (version 6.1.0-17-amd64) was used}
         \end{itemize}        
     \end{itemize}
     \begin{figure}
@@ -253,10 +253,11 @@
         \item Sync NICs and system times using Precision Time Protocol (PTP)\footnote{https://github.com/richardcochran/linuxptp}
         \item 1 iteration with 128MB file size using Dogecoin\footnote{Dogecoin: \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU, 32 GB of RAM, and \emph{Intel X552 10 GbE SFP+} NICs, using \emph{ixgbe driver} (version 6.1.0-17-amd64) over a 10 Gbase link.}
         \item Generates more than 100k NIC-to-Userspace packet time differences
+        \item Poor documentation and integration into QIR was a difficult and length process
     \end{itemize}
     \begin{figure}
         \centering
-        \includegraphics[width=.75\textwidth]{pics/ptp-topology2.pdf}
+        \includegraphics[width=.75\textwidth]{pics/ptp-topology2v2.pdf}
         \label{fig3}
     \end{figure}
 \end{frame}
@@ -356,20 +357,27 @@
     \begin{itemize}
         \item To what extent can we increase QUIC performance by using XDP in a trivial way? Is there optimization potential?
         \begin{itemize}
-            \item AF\_XDP is not able to achieve a higher goodput over recvmmsg()+GRO
-            \item AF\_XDP NIC-to-userspace times remain consistent with the default datapath
+            \item AF\_XDP is not able to achieve a higher goodput over the optimized default datapath
+            \item Also, AF\_XDP NIC-to-userspace times remain consistent with the default datapath
             \item However, optimization potential exists
         \end{itemize}
     \end{itemize}
     \begin{itemize}
-        \item Can a taxonomy be created for QUIC optimizations, categorizing them by implementation complexity, performance improvement potential, unwanted side effects, privilege level usage, and deployment?
+        \item Can a taxonomy be created for QUIC optimizations, categorized by:
         \begin{itemize}
-            \item Yes, each datapath offers its unique set of tradeoffs
+            \item Implementation complexity
+            \item Performance improvement potential
+            \item Unwanted side effects
+            \item Privilege level usage
+            \item Deployment
         \end{itemize}
     \end{itemize}
+    \begin{center}
+        \yes\ Yes, each datapath offers its unique set of tradeoffs
+    \end{center}
 \end{frame}
 
-\section{Next Steps}
+\section{Future Work}
 \begin{frame}
     \begin{itemize}
         \item Enable GRO for AF\_XDP, for which driver support has been increasing~\cite{xdp_multibuff_2019}
