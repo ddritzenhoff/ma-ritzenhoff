@@ -151,7 +151,7 @@
     \frametitle{Goodput}
     \begin{itemize}
         \item Patch MsQuic\footnote{https://github.com/microsoft/msquic} to support AF\_XDP
-        \item Run throughput tests in a client-server topology
+        \item Run goodput tests in a client-server topology
         \item 20 iterations with 8GB file size using weak (Dogecoin) and strong (Opulous) CPU setups:
         \begin{itemize}
             \item Dogecoin: \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU, 32 GB of RAM, and \emph{Intel X552 10 GbE SFP+} NICs, over a 10G link\footnote{Additionally, ixgbe driver (version 6.1.0-17-amd64) was used}
@@ -223,7 +223,7 @@
     \frametitle{AF\_XDP on the Client (Dogecoin)}
     \begin{itemize}
         \item Surprisingly, the XDP alternatives are no longer statistically significant from each other
-        \item Talk about large \texttt{XDP\_SKB} std dev. here?
+        \item Yet, XDP modes are closer in goodput to the default datapath with all optimizations
     \end{itemize}
     \begin{figure}
         \centering
@@ -253,7 +253,7 @@
         \item Sync NICs and system times using Precision Time Protocol (PTP)\footnote{https://github.com/richardcochran/linuxptp}
         \item 1 iteration with 128MB file size using Dogecoin\footnote{Dogecoin: \emph{Intel Xeon D-1518 @ 2.20GHz 4-core} CPU, 32 GB of RAM, and \emph{Intel X552 10 GbE SFP+} NICs, using \emph{ixgbe driver} (version 6.1.0-17-amd64) over a 10 Gbase link.}
         \item Generates more than 100k NIC-to-Userspace packet time differences
-        \item Poor documentation and integration into QIR was a difficult and length process
+        \item Poor documentation and integration into QIR was a difficult and lengthy process
     \end{itemize}
     \begin{figure}
         \centering
@@ -277,10 +277,9 @@
 \section{Related Work}
 \begin{frame}
     \begin{itemize}
-        \item DPDK\footnote{https://www.dpdk.org/}\nocite{dpdk} enables kernel bypass and allows application to connect directly to the NIC, reducing kernel overhead
+        \item \textit{QUIC Performance Improvements Using Socket Optimizations and Kernel Bypass}\footnote{Späth, J. QUIC performance improvements using socket optimizations and kernel bypass. Master’s thesis, TU Munich, 2023.}\nocite{spaeth2023} investigates methods to improve QUIC performance by means of patching MsQuic with DPDK and using socket optimizations
         \item lxin-quic\footnote{https://github.com/lxin/quic}\nocite{lxin_quic} brings QUIC into the kernel, reducing context switches and copying between kernel and userspace
-        \item \textit{QUIC Performance Improvements Using Socket Optimizations and Kernel Bypass}\footnote{Späth, J. QUIC performance improvements using socket optimizations and kernel bypass. Master’s thesis, TU Munich, 2023.}\nocite{spaeth2023} investigates methods to improve QUIC performance by means
-        of patching MsQuic with DPDK and using socket optimizations
+        \item DPDK\footnote{https://www.dpdk.org/}\nocite{dpdk} enables kernel bypass and allows application to connect directly to the NIC, reducing kernel overhead
     \end{itemize}
     % \begin{figure}
     %     \centering
