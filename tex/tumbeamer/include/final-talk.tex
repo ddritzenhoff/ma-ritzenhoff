@@ -232,20 +232,6 @@
     \end{figure}
 \end{frame}
 
-\section{Measurements}
-\begin{frame}
-    \frametitle{RX Batch Sizes with AF\_XDP on the Client (Dogecoin)}
-    \begin{itemize}
-        \item Goodput increases as RX batch size increases until 32
-        \item The bottleneck changes; MsQuic must no longer wait for packets and instead spends its time on processing
-    \end{itemize}
-    \begin{figure}
-        \centering
-        \includegraphics[width=.75\textwidth]{pics/dogecoin-batch-size.pdf}
-        \label{fig6}
-    \end{figure}
-\end{frame}
-
 \section{Approach}
 \begin{frame}
     \frametitle{NIC-to-Userspace Packet Traversal Time}
@@ -306,7 +292,7 @@
         \toprule
         \textbf{Metric} & \textbf{GSO/GRO} & \textbf{AF\_XDP} & \textbf{In-kernel QUIC} & \textbf{DPDK} \\
         \midrule
-        \textbf{Impl. Complexity} & Low & High & High & High \\
+        % \textbf{Impl. Complexity} & Low & High & High & High \\
         \textbf{Standardized APIs} & \yes & \no & \yes & \no \\
         \textbf{Kernel Integration} & High & Medium & High & Low \\
         \textbf{NIC Sharing} & \yes & \yes & \yes & \no \\
@@ -379,9 +365,23 @@
 \begin{frame}
     \begin{itemize}
         \item Enable GRO for AF\_XDP, for which driver support has been increasing~\cite{xdp_multibuff_2019}
-        \item Increase the TX ring batch size from its default of 1, which may offer similar speedups as seen in the RX batch size case
+        \item Expanding hardware offloads to include encryption\footnote{https://github.com/microsoft/net-offloads/blob/main/quic-encryption-offload.md}
         \item Perform throughput and latency measurements across all QUIC datapaths on the same testbed
     \end{itemize}
+\end{frame}
+
+\section{Appendix}
+\begin{frame}
+    \frametitle{RX Batch Sizes with AF\_XDP on the Client (Dogecoin)}
+    \begin{itemize}
+        \item Goodput increases as RX batch size increases until 32
+        \item The bottleneck changes; MsQuic must no longer wait for packets and instead spends its time on processing
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{pics/dogecoin-batch-size.pdf}
+        \label{fig6}
+    \end{figure}
 \end{frame}
 
 \section{Appendix}
