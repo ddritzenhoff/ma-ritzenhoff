@@ -224,6 +224,7 @@ For the PTP tests, you want to use the configs in `configs/splitter/ptp/`. The f
 #### PTP-related Artifacts
 
 - `msquic-no-xdp-log`
+- `msquic-xdp-log`
 
 `python3 fetch_artifacts.py --implementations <artifact>`
 
