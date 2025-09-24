@@ -238,3 +238,38 @@ For the PTP tests, you want to use the configs in `configs/splitter/ptp/`. The f
 `python3 run.py --debug --config <config>`
 
 ### Analyzing the Results
+
+Before going through the steps, I'd like to acknowledge that it is a janky process. I tried to iterate a few times to get it working better to no avail. However, I'm sure with more time, I could have found something. Also, when you try to reproduce, keep in mind what Stefan Lachnit said about disabling some sort of polling feature in the NIC. I wasn't aware of it until after the final presentation, which lead me to my current conclusion. For more interesting results, it may be worth to experiment with this feature. We talked about this when doing the performance review after the final presentation. Stefan said that it was a command also mentioned within one of Paul Emmerich's papers. Perhaps it was something along the lines of `ethtool -C eth0 rx-usecs <microseconds>`.
+
+After running the test, you will find the `.json` file containing the packet numbers and their associated arrival times for the _client_ in the log directory that is generated after each completed `run.py` invocation. It'll sit in the `/client/` directory and will look something like this:
+
+```json
+{
+  "date": "2025-06-25",
+  "timezone": "UTC",
+  "packets": [
+    {
+      "timestamp": "12:34:30.445071472 (UTC)",
+      "fractional_part": "445071472",
+      "time_part": "14:34:30",
+      "epoch_time": "1750854870.445071472",
+      "packet_number": 0
+    },
+    {
+      "timestamp": "12:34:30.445414068 (UTC)",
+      "fractional_part": "445414068",
+      "time_part": "14:34:30",
+      "epoch_time": "1750854870.445414068",
+      "packet_number": 1
+    },
+```
+
+Alongside the json file is a `keys.log` file. You want to take these two files in addition to the `trace-server-ptp.pcap` file within the `/sniffer/` directory and copy everything to one place.
+
+At the high level, the objective at this point is to create a `.json` file for the sniffer, similar to the client's `.json` file, by decrypting the pcap with the `keys.log` and then running it through the `quic-analyzer.py` script. To decrypt, I used Wireshark, but I occasionally had hang-ups with it. Another tool may be more reliable. 
+
+Once you've gotten the decrypted pcap, you run `quic-analyzer.py` on it using a command similar to this one: `python3 quic-analyzer.py -p no-xdp-log/trace-ptp.pcap -k no-xdp-log/keys.log -s 10.0.0.2 -d 10.0.0.1 -o no-xdp-log/no-xdp-nic.json`. I've included some stubs within the `/ptp/` directory within this repository for you to take a look at and see how it's done. Finally, note that you _have_ to decrypt the pcap before invoking this script. I know the source code gives the impression that it does the decryption for you, but it was a failed attempt.
+
+At this point in time, you should have two .json files: `no-xdp-nic.json` and `no-xdp-userspace.json` or `xdp-nic.json` and `xdp-userspace.json`. Now we want to 'zip' the files together and calculate the time difference between the userspace times to the HW timestamp times. For this we use the `zipper.py` script. We invoke it using arguments similar to this: `python3 zipper.py -fu no-xdp-log/no-xdp-userspace.json -fn no-xdp-log/no-xdp-nic.json -s 50 -o no-xdp-log/no-xdp-zipped.json`. This calculates the time difference between the same packets starting from number 50 (I've found some of the earlier packets go missing for whatever reason).
+
+Once you have `no-xdp-zipped.json` or `xdp-zipped.json`, you can create the boxplot or CDF using the `delta-boxplots.py` and `cdf-graph.py` scripts, respectively. For `delta-boxplots.py`, the arguemnts will look like `python3 delta-boxplots.py --files no-xdp-log/no-xdp-zipped.json xdp-log/xdp-zipped.json --output figure0.pdf --labels "No XDP" "XDP"`. For `cdf-graph.py`, `python3 cdf-graph.py no-xdp-log/no-xdp-zipped.json xdp-log/xdp-zipped.json --labels "No XDP" "XDP"`.
